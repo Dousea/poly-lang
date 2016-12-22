@@ -1,0 +1,119 @@
+#ifndef POLY_VALUE_H_
+#define POLY_VALUE_H_
+
+typedef enum
+{
+	VALUE_NUMBER,
+	VALUE_BOOLEAN
+} PolyValueType;
+
+typedef struct
+{
+	PolyValueType type;
+	union
+	{
+		double num;
+		unsigned int bool : 1;
+	};
+} PolyValue;
+
+typedef enum
+{
+	TOKEN_OPENRNDBRCKT,
+	TOKEN_CLOSERNDBRCKT,
+	TOKEN_OPENCRLYBRCKT,
+	TOKEN_CLOSECRLYBRCKT,
+	TOKEN_OPENSQRBRCKT,
+	TOKEN_CLOSESQRBRCKT,
+	TOKEN_EQ,
+	TOKEN_LT,
+	TOKEN_GT,
+	TOKEN_UNEQ,
+	TOKEN_EQEQ,
+	TOKEN_LTEQ,
+	TOKEN_GTEQ,
+	TOKEN_NMBRSGN,
+	TOKEN_ATSGN,
+	TOKEN_PRCNTSGN,
+	TOKEN_QSTNMRK,
+	TOKEN_EXCLMTNMRK,
+	TOKEN_SINGLEQTMRK,
+	TOKEN_DOUBLEQTMRK,
+	TOKEN_CLN,
+	TOKEN_CLNCLN,
+	TOKEN_DOT,
+	TOKEN_DOTDOT,
+	TOKEN_DOTDOTDOT,
+	TOKEN_COMMA,
+	TOKEN_PLUS,
+	TOKEN_MINUS,
+	TOKEN_ASTERISK,
+	TOKEN_SLASH,
+	TOKEN_CARET,
+	TOKEN_BACKSLASH,
+
+	TOKEN_AND,
+	TOKEN_CASE,
+	TOKEN_CLASS,
+	TOKEN_CONSTRUCTOR,
+	TOKEN_CONTINUE,
+	TOKEN_ELSE,
+	TOKEN_END,
+	TOKEN_EXTEND,
+	TOKEN_EXTERN,
+	TOKEN_FALSE,
+	TOKEN_FUNCTION,
+	TOKEN_GET,
+	TOKEN_IF,
+	TOKEN_INTERN,
+	TOKEN_NAMESPACE,
+	TOKEN_NOT,
+	TOKEN_NULL,
+	TOKEN_OR,
+	TOKEN_PROPERTY,
+	TOKEN_RETURN,
+	TOKEN_SET,
+	TOKEN_SUPER,
+	TOKEN_TRUE,
+	TOKEN_WHEN,
+	TOKEN_WHILE,
+
+	TOKEN_IDENTIFIER,
+	TOKEN_NUMBER,
+
+	TOKEN_NEWLINE,
+	TOKEN_SPACE,
+	TOKEN_TAB,
+
+	TOKEN_UNKNOWN,
+	TOKEN_EOF
+} PolyTokenType;
+
+typedef struct
+{
+	// Type of token
+	PolyTokenType type;
+	// Character that points to [Lexer.source] of token's starting position
+	const char *start;
+	// Length of token from [start]
+	int len;
+	// Literal value
+	PolyValue value;
+} PolyToken;
+
+typedef struct
+{
+	const char* word;
+	PolyTokenType type;
+	int len;
+} PolyKeyword;
+
+typedef enum
+{
+	CODE_LITERAL_NUMBER,
+	CODE_LITERAL_FALSE,
+	CODE_LITERAL_TRUE,
+	CODE_EOF
+} PolyCode;
+
+#endif /* POLY_VALUE_H_ */

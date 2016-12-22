@@ -1,13 +1,12 @@
-#include <stdlib.h>
-
-#include "compiler.h"
+#include "poly_vm.h"
 
 int main()
 {
-	Compiler *compiler = Compiler_new();
+	// A test..
+	PolyVM *vm = polyNewVM();
 
-	Compiler_compile(compiler, "a = 12345678e-4");
-	Compiler_free(compiler);
+	polyCompile(&vm->compiler, "if a + b == c:\n    output()");
+	polyFreeVM(vm);
 
 	return 0;
 }
