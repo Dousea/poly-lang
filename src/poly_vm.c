@@ -1,9 +1,11 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "poly.h"
 #include "poly_value.h"
+#include "poly_parser.h"
 #include "poly_vm.h"
 
 static void push(PolyVM *vm, PolyValue *value)
@@ -47,27 +49,30 @@ static PolyValue *pop(PolyVM *vm)
 PolyVM *polyNewVM(void)
 {
 	PolyVM *vm = (PolyVM*)polyAllocate(NULL, sizeof(PolyVM));
-	PolyCompiler *compiler = &vm->compiler;
-	PolyParser *parser = &compiler->parser;
-	PolyLexer *lexer = &parser->lexer;
-	lexer->tokenstart = NULL;
-	lexer->stream = polyAllocate(NULL, sizeof(PolyToken));
-	lexer->totaltoken = 0;
+	PolyParser *parser = &vm->parser;
+	parser->tokenstart = NULL;
+	parser->tokenstream = polyAllocate(NULL, sizeof(PolyToken));
+	parser->totaltoken = 0;
 
 	return vm;
 }
 
 void polyFreeVM(PolyVM *vm)
 {
-	polyAllocate(vm->compiler.parser.lexer.stream, 0);
+	polyAllocate(vm->parser.tokenstream, 0);
+//	polyAllocate(vm->parser.codestream, 0);
 //	polyAllocate(vm->stack, 0);
-//	polyAllocate(vm->stream, 0);
 	polyAllocate(vm, 0);
 }
 
-void polyInterpret(PolyVM *vm)
+void polyInterpret(PolyVM *vm, const char *source)
 {
-	PolyCode *code = vm->stream;
+	PolyParser *parser = &vm->parser;
+
+	polyParse(parser, source);
+
+	/*
+	PolyCode *code = parser->codestream;
 
 	while (*code != CODE_EOF)
 	{
@@ -83,4 +88,5 @@ void polyInterpret(PolyVM *vm)
 
 		code++;
 	}
+	*/
 }
