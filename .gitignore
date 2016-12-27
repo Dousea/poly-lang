@@ -1,0 +1,8 @@
+# Build outputs
+Debug/
+Release/
+
+# Eclipse-specific settings
+.settings/
+.cproject
+.project
