@@ -3,17 +3,15 @@
 
 #include "poly_value.h"
 #include "poly_parser.h"
-
-// Maximum values inside VM's stack
-#define MAX_STACK 128
+#include "poly_vm.h"
 
 typedef struct
 {
-	PolyParser parser;
+	Parser parser;
 	// Current stack size
 	int stacksize;
 	// Stack that's used by the VM
-	PolyValue *stack[MAX_STACK];
+	Value *stack[MAX_STACK];
 } PolyVM;
 
 PolyVM *polyNewVM(void);

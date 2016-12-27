@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <math.h>
 
 #include "poly.h"
 #include "poly_value.h"
@@ -11,7 +12,12 @@
   //////////////////////
  // Lexical Analysis //
 //////////////////////
-static PolyKeyword keywords[] = {
+static struct
+{
+	const char* word;
+	TokenType type;
+	int len;
+} keywords[] = {
 		{ "and",         TOKEN_AND,         3  },
 		{ "case",        TOKEN_CASE,        4  },
 		{ "class",       TOKEN_CLASS,       5  },
@@ -40,32 +46,32 @@ static PolyKeyword keywords[] = {
 };
 
 // Gets current character that's being read
-static char curchar(PolyParser *parser)
+static char curchar(Parser *parser)
 {
 	return *parser->curchar;
 }
 
 // Gets next character that will be read
-static char nextchar(PolyParser *parser)
+static char nextchar(Parser *parser)
 {
 	return *(parser->curchar + 1);
 }
 
 // Gets previous character that's already read
-static char prevchar(PolyParser *parser)
+static char prevchar(Parser *parser)
 {
 	return *(parser->curchar - 1);
 }
 
 // Advances to the next character
-static void advchar(PolyParser *parser)
+static void advchar(Parser *parser)
 {
 	parser->curchar++;
 }
 
 // If next character is [c] advance to the character then return 1, otherwise
 // return 0
-static _Bool conchar(PolyParser *parser, char c)
+static _Bool conchar(Parser *parser, char c)
 {
 	if (nextchar(parser) == c)
 	{
@@ -77,21 +83,21 @@ static _Bool conchar(PolyParser *parser, char c)
 }
 
 // Gets length from token's start position to current character
-static int lenchar(PolyParser *parser)
+static int lenchar(Parser *parser)
 {
 	return (int)(parser->curchar - parser->tokenstart) + 1;
 }
 
 // Creates a new token then put it in tokenstream
-static void mktoken(PolyParser *parser, PolyTokenType type)
+static void mktoken(Parser *parser, TokenType type)
 {
 	// Makes a new token
-	PolyToken token;
+	Token token;
 	token.type = type;
 	token.start = parser->curchar;
 	token.len = lenchar(parser);
 	// Allocates a new memory each time a new token is being made
-	parser->tokenstream = polyAllocate(parser->tokenstream, sizeof(PolyToken) * ++parser->totaltoken);
+	parser->tokenstream = polyAllocate(parser->tokenstream, sizeof(Token) * ++parser->totaltoken);
 	parser->tokenstream[parser->totaltoken - 1] = token;
 
 #ifdef POLY_DEBUG
@@ -100,26 +106,54 @@ static void mktoken(PolyParser *parser, PolyTokenType type)
 }
 
 // Creates [second] token if next character is [c], otherwise [first] token
-static void mkdbltoken(PolyParser *parser, char c, PolyTokenType first, PolyTokenType second)
+static void mkdbltoken(Parser *parser, char c, TokenType first, TokenType second)
 {
 	return (conchar(parser, c) ? mktoken(parser, second) : mktoken(parser, first));
 }
 
 // Reads/skips comment
-// TODO: Reads multi-line comment (#: ... :#)
-static void readcomment(PolyParser *parser)
+static void readcomment(Parser *parser)
 {
-	while (nextchar(parser) != '\n' || nextchar(parser) != '\0')
-		advchar(parser);
+	// Multi-line comment -> #:<comment>:#
+	if (conchar(parser, ':'))
+	{
+		int nested = 0;
+
+		while (nextchar(parser) != '\0')
+		{
+			if (conchar(parser, '#'))
+			{
+				if (conchar(parser, ':'))
+					nested++;
+			}
+			else if (conchar(parser, ':'))
+			{
+				if (conchar(parser, '#'))
+					nested--;
+			}
+
+			if (nested < 0)
+				return;
+
+			advchar(parser);
+		}
+
+		// If we go here then this must be an unterminated comment
+		fprintf(stderr, "Unterminated comment");
+	}
+	// Single-line comment -> #<comment>
+	else
+		while (nextchar(parser) != '\n' && nextchar(parser) != '\0')
+			advchar(parser);
 }
 
 // Reads name
-static void readname(PolyParser *parser)
+static void readname(Parser *parser)
 {
 	while (isalnum(nextchar(parser)) || nextchar(parser) == '_')
 		advchar(parser);
 
-	PolyTokenType type = TOKEN_IDENTIFIER;
+	TokenType type = TOKEN_IDENTIFIER;
 
 	// Check if the name is reserved word/keyword
 	for (int i = 0; keywords[i].word != NULL; i++)
@@ -131,11 +165,18 @@ static void readname(PolyParser *parser)
 	}
 
 	mktoken(parser, type);
+
+	if (type == TOKEN_FALSE || type == TOKEN_TRUE)
+	{
+		Token *t = parser->tokenstream + (parser->totaltoken - 1);
+		t->value.type = VALUE_BOOLEAN;
+		t->value.bool = (type == TOKEN_FALSE ? 0 : 1);
+	}
 }
 
 // Reads number
 // TODO: Reads hex? (low priority)
-static void readnumber(PolyParser *parser)
+static void readnumber(Parser *parser)
 {
 	while (isdigit(nextchar(parser)))
 		advchar(parser);
@@ -166,14 +207,22 @@ static void readnumber(PolyParser *parser)
 
 	mktoken(parser, TOKEN_NUMBER);
 
-	PolyToken *t = parser->tokenstream + (parser->totaltoken - 1);
+	Token *t = parser->tokenstream + (parser->totaltoken - 1);
 	t->value.type = VALUE_NUMBER;
 	t->value.num = num;
 }
 
 // Creates a lexical token tokenstream to be parsed
-static void lex(PolyParser *parser)
+static void lex(Parser *parser)
 {
+	// Is first indentation already occured?
+	_Bool firstindent = 0;
+	// Indentation that will be used for scopes
+	struct {
+		char c;
+		int len;
+	} indent;
+	// Current character that's being lexed
 	char c;
 
 	while ((c = curchar(parser)) != '\0')
@@ -212,7 +261,7 @@ static void lex(PolyParser *parser)
 			break;
 		case ':':
 			mkdbltoken(parser, c, TOKEN_CLN, TOKEN_CLNCLN); break;
-		case '.': // TODO: Maybe read number with no leading zero (e.g. .75)? (low priority)
+		case '.': // TODO: Maybe reads number with no leading zero (e.g. .75)? (low priority)
 			if (conchar(parser, c))
 				mkdbltoken(parser, c, TOKEN_DOTDOT, TOKEN_DOTDOTDOT);
 			else
@@ -236,13 +285,45 @@ static void lex(PolyParser *parser)
 		case '\n':
 			mktoken(parser, TOKEN_NEWLINE); break;
 		case ' ': case '\t':
-			// Conserve memory by not creating whitespace tokens if previous token is not new line
 			if (prevchar(parser) == '\n')
 			{
-				while (nextchar(parser) == c)
-					advchar(parser);
+				if (firstindent == 0)
+				{
+					firstindent = 1;
+					indent.c = c;
 
-				mktoken(parser, (c == ' ' ? TOKEN_SPACE : TOKEN_TAB));
+					while (nextchar(parser) == c)
+						advchar(parser);
+
+					indent.len = lenchar(parser);
+
+					mktoken(parser, TOKEN_INDENT);
+
+					Token *t = parser->tokenstream + (parser->totaltoken - 1);
+					t->len = 1;
+				}
+				else
+				{
+					if (c == indent.c)
+					{
+						while (nextchar(parser) == c)
+							advchar(parser);
+
+						int len = lenchar(parser);
+
+						if (len % indent.len == 0)
+						{
+							mktoken(parser, TOKEN_INDENT);
+
+							Token *t = parser->tokenstream + (parser->totaltoken - 1);
+							t->len = len / indent.len;
+						}
+						else // TODO: Gives a parser error
+							fprintf(stderr, "Please have a consistent type of indentation\n");
+					}
+					else // TODO: Gives a parser error
+						fprintf(stderr, "Please have a consistent type of indentation\n");
+				}
 			}
 
 			break;
@@ -310,7 +391,7 @@ static _Bool isunop(PolyParser *parser, PolyTokenType type)
 */
 
 // Checks if the lexical token stream is at an allowable form and creates bytecodes
-void polyParse(PolyParser *parser, const char *source)
+void polyParse(Parser *parser, const char *source)
 {
 #ifdef POLY_DEBUG
 	printf("Parsing %s with memory:%lu\n", source, (unsigned long)parser);
@@ -330,15 +411,15 @@ void polyParse(PolyParser *parser, const char *source)
 #endif
 
 	// Current token that's being consumed
-	PolyToken *curtoken = parser->tokenstream;
+	Token *curtoken = parser->tokenstream;
 	// Previous token that already consumed
-	PolyToken *prevtoken = curtoken;
+	Token *prevtoken = curtoken;
 	// Current line position of token that's being consumed
 	int curln = 1;
-	// Indentation that will be used for scopes
-	PolyToken indent;
-	// Current scope (?)
-	int curscope = 0;
+	// Current scope level
+	int curscopelvl = 0;
+	// Current scope
+	Scope *curscope = *(parser->scope + curscopelvl);
 
 	while (curtoken->type != TOKEN_EOF)
 	{
@@ -351,44 +432,45 @@ void polyParse(PolyParser *parser, const char *source)
 		case TOKEN_NEWLINE:
 			curln++; break;
 		// Previous token is new line and current token is whitespace? Must be indentation!
-		case TOKEN_SPACE: case TOKEN_TAB:
-			if (prevtoken->type == TOKEN_NEWLINE)
-			{
-				// There's no [parser]->indent yet so we must create it for reading further indents
-				// So we can throw errors at programmers if they don't obey their own indent!
-				if (indent.type != TOKEN_SPACE && indent.type != TOKEN_TAB)
-				{
-					printf("First indentation detected - indentation level 0\n");
+		case TOKEN_INDENT:
+			; // Without this semicolon, GCC compiler would show an error
+			int newscopelvl;
+			newscopelvl = curtoken->len;
 
-					indent.type = curtoken->type;
-					indent.len = curtoken->len;
+			// Difference from newscope to curscope must be 1
+			if (abs(newscopelvl - curscopelvl) != 1)
+				// TODO: Gives a parser error
+				fprintf(stderr, "Incorrect scoping from level %d to %d\n", curscopelvl, newscopelvl);
 
-					// TODO: Scoping
-				}
-				else
-				{
-					if (curtoken->type == indent.type)
-					{
-						if (curtoken->len % indent.len == 0)
-						{
-							// TODO: Scoping
-							curscope = curtoken->len / indent.len;
+			if (newscopelvl > MAX_SCOPES)
+				// TODO: Gives a parser error
+				fprintf(stderr, "Exceeds allowed scopes");
 
-							printf("Indentation level %d", curscope);
-						}
-						else // TODO: Gives a parser error
-							fprintf(stderr, "Please have a consistent type of indentation\n");
-					}
-					else // TODO: Gives a parser error
-						fprintf(stderr, "Please have a consistent type of indentation\n");
-				}
-			}
+			curscopelvl = newscopelvl;
+			curscope = *(parser->scope + curscopelvl);
+
+#ifdef POLY_DEBUG
+			printf("Indentation level %d\n", curscopelvl);
+#endif
 
 			break;
 		case TOKEN_UNKNOWN:
 			// TODO: Gives a parser error
 			fprintf(stderr, "An unknown token is found\n"); break;
 		default:
+			// If current token is not whitespace but previous token is new
+			// line then reset current scope to 0 as no indentation
+			// detected
+			if (prevtoken->type == TOKEN_NEWLINE && curscopelvl != 0)
+			{
+				curscopelvl = 0;
+				curscope = *(parser->scope + curscopelvl);
+
+#ifdef POLY_DEBUG
+				printf("Indentation level 0\n");
+#endif
+			}
+
 			break;
 		}
 

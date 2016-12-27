@@ -8,12 +8,71 @@
 #include "poly_parser.h"
 #include "poly_vm.h"
 
-static void push(PolyVM *vm, PolyValue *value)
+// Hashes string [s]
+static uint32_t hash(char *s)
+{
+	uint32_t hashval;
+
+	for (hashval = 0; *s != '\0'; s++)
+		hashval = *s + 31 * hashval;
+
+	return hashval % MAX_LOCALS;
+}
+
+// Looks up PolyLocal with name [s] inside [locals]
+static Local *lookup(Local *locals, char *s)
+{
+	Local *local;
+
+	for (local = &locals[hash(s)]; local != NULL; local = local->next)
+		if (strcmp(s, local->name) == 0)
+			return local;
+
+	return NULL;
+}
+
+// Inserts PolyLocal with name [name] and value [value] to [locals]
+static Local *insert(Local *locals, char *name, Value value)
+{
+	Local *local;
+
+	// Not found? Insert it right away!
+	if ((local = lookup(locals, name)) == NULL)
+	{
+		local = (Local*)polyAllocate(NULL, sizeof(Local));
+
+		// Can't duplicate the name? Then nothing we can do
+		if ((local->name = strdup(name)) == NULL)
+			return NULL;
+
+		uint32_t hashval = hash(name);
+		local->next = &locals[hashval];
+		locals[hashval] = *local;
+	}
+	else
+		free(local->value);
+
+	// Duplicate [value]
+	/*
+	PolyValue *cpy = (PolyValue*)malloc(sizeof(PolyValue));
+
+	if (cpy != NULL)
+		memcpy(cpy, value, sizeof(*cpy));
+	else
+		return NULL;
+	*/
+
+	local->value = &value; // local->value = cpy
+
+	return local;
+}
+
+static void push(PolyVM *vm, Value *value)
 {
 	*(vm->stack + vm->stacksize++) = value;
 }
 
-static void pushlitnum(PolyVM *vm, PolyCode *code)
+static void pushlitnum(PolyVM *vm, Code *code)
 {
 	// Convert [size] bytes ahead in [bytecode] so we can transform it to double
 	double num;
@@ -26,7 +85,7 @@ static void pushlitnum(PolyVM *vm, PolyCode *code)
 	memcpy(&num, &b, size);
 
 	// Create a new PolyValue to be pushed in stack
-	PolyValue value;
+	Value value;
 	value.type = VALUE_NUMBER;
 	value.num = num;
 	push(vm, &value);
@@ -35,13 +94,13 @@ static void pushlitnum(PolyVM *vm, PolyCode *code)
 static void pushlitbool(PolyVM *vm)
 {
 	// Just create a new PolyValue as the literal is true or false, no conversion needed
-	PolyValue value;
+	Value value;
 	value.type = VALUE_BOOLEAN;
 	value.bool = (CODE_LITERAL_FALSE ? 0 : 1);
 	push(vm, &value);
 }
 
-static PolyValue *pop(PolyVM *vm)
+static Value *pop(PolyVM *vm)
 {
 	return *(vm->stack + --vm->stacksize);
 }
@@ -49,10 +108,11 @@ static PolyValue *pop(PolyVM *vm)
 PolyVM *polyNewVM(void)
 {
 	PolyVM *vm = (PolyVM*)polyAllocate(NULL, sizeof(PolyVM));
-	PolyParser *parser = &vm->parser;
+	Parser *parser = &vm->parser;
 	parser->tokenstart = NULL;
-	parser->tokenstream = polyAllocate(NULL, sizeof(PolyToken));
+	parser->tokenstream = polyAllocate(NULL, sizeof(Token));
 	parser->totaltoken = 0;
+	// TODO: Allocation for parser->codestream?
 
 	return vm;
 }
@@ -67,7 +127,7 @@ void polyFreeVM(PolyVM *vm)
 
 void polyInterpret(PolyVM *vm, const char *source)
 {
-	PolyParser *parser = &vm->parser;
+	Parser *parser = &vm->parser;
 
 	polyParse(parser, source);
 
