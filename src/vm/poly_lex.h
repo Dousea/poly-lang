@@ -1,5 +1,5 @@
-#ifndef POLY_PARSER_H_
-#define POLY_PARSER_H_
+#ifndef POLY_LEX_H
+#define POLY_LEX_H
 
 #include "poly_value.h"
 
@@ -76,48 +76,17 @@ typedef enum
 
 typedef struct
 {
-	// Type of token
 	TokenType type;
-	// Character that points to [Lexer.source] of token's starting position
 	const char *start;
-	// Length of token from [start]
 	int len;
-	// Literal value
 	Value value;
 } Token;
 
-struct Local
-{
-	struct Local *next;
-	char *name;
-	Value *value;
-};
-
-typedef struct Local Local;
-
 typedef struct
 {
-	Local *locals[MAX_LOCALS];
-} Scope;
-
-typedef struct
-{
-	// Source that's being lexed
 	const char *source;
-	// Current lexed character that points to [source]
 	const char *curchar;
-	// Character that points to [source] of the new token's start
 	const char *tokenstart;
-	// Lexical token stream that's used by parser
-	Token *tokenstream;
-	// Total allocated tokens in [stream]
-	int totaltoken;
-	// Scopes
-	Scope *scope[MAX_SCOPES];
-	// Bytecode stream that's interpreted by the VM
-	Code *codestream;
-} Parser;
+} Lexer;
 
-void polyParse(Parser *parser, const char *source);
-
-#endif /* POLY_PARSER_H_ */
+#endif

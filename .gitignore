@@ -1,6 +1,7 @@
 # Build outputs
-Debug/
-Release/
+bin/
+lib/
+obj/
 
 # Eclipse-specific settings
 .settings/
