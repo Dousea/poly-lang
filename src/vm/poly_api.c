@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #include "poly_config.h"
 #include "poly_vm.h"
@@ -64,7 +65,9 @@ POLY_API VM *polyNewVM(Config *config)
 		memcpy(vm->config, config, sizeof(Config));
 	}
 
-	vm->parser.tokenstream = vm->config->allocator(NULL, sizeof(Token));
+	vm->parser.allocatedmemory = 0;
+	vm->parser.maxmemory = POLY_INITIAL_MEM;
+	vm->parser.tokenstream = vm->config->allocator(NULL, POLY_INITIAL_MEM);
 	vm->parser.totaltoken = 0;
 
 	return vm;
@@ -78,6 +81,22 @@ POLY_API void polyFreeVM(VM *vm)
 	defaultAllocator(vm->config, 0);
 	defaultAllocator(vm, 0);
 }
+
+/*
+static void push(VM *vm, Value *value)
+{
+	assert(vm->stacksize < POLY_MAX_STACK);
+
+	vm->stack[vm->stacksize++] = value;
+}
+
+static Value *pop(VM *vm)
+{
+	assert(vm->stacksize > 0);
+
+	return vm->stack[--vm->stacksize];
+}
+*/
 
 POLY_API void polyInterpret(VM *vm, const char *source)
 {

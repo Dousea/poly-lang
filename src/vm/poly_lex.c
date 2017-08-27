@@ -91,12 +91,19 @@ static void mktoken(VM *vm, TokenType type)
 	token.type = type;
 	token.start = vm->parser.lexer.curchar;
 	token.len = lenchar(&vm->parser.lexer);
-	// Allocates a new memory each time a new token is being made
-	vm->parser.tokenstream = vm->config->allocator(vm->parser.tokenstream, sizeof(Token) * ++vm->parser.totaltoken);
-	vm->parser.tokenstream[vm->parser.totaltoken - 1] = token;
+
+	// Keep track on our memory allocation here
+	size_t size = sizeof(Token);
+
+	if (vm->parser.allocatedmemory + size > vm->parser.maxmemory)
+		vm->parser.tokenstream = vm->config->allocator(vm->parser.tokenstream,
+				(vm->parser.maxmemory = POLY_ALLOCATE_MEM(vm->parser.maxmemory)));
+
+	vm->parser.allocatedmemory += size;
+	vm->parser.tokenstream[++vm->parser.totaltoken - 1] = token;
 
 #ifdef POLY_DEBUG
-	printf("Token %d created\n", type);
+	printf("Token %d created, allocated memory: %d\n", type, vm->parser.allocatedmemory);
 #endif
 }
 

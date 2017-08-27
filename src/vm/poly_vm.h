@@ -9,11 +9,11 @@ typedef struct
 {
 	Config *config;
 	Parser parser;
-	int stacksize;
+	unsigned int stacksize;
 	Value *stack[POLY_MAX_STACK];
 } VM;
 
 void lex(VM *vm);
-void parse(VM *vm, const char *source);
+void parse(VM *vm);
 
 #endif

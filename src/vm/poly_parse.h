@@ -7,7 +7,9 @@ typedef struct
 {
 	Lexer lexer;
 	Token *tokenstream;
-	int totaltoken;
+	unsigned int allocatedmemory;
+	unsigned int maxmemory;
+	unsigned int totaltoken;
 } Parser;
 
 #endif
