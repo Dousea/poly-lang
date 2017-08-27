@@ -52,7 +52,7 @@ ALLO := $(VMO) $(TESTO)
 ALLT := $(VMA) $(TESTT)
 
 default:
-	$(MAKE) $(TESTT)
+	$(MAKE) $(ALLT)
 
 echo:
 	@echo "PLATFORM=$(PLATFORM)"
