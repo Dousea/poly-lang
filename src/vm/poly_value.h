@@ -13,7 +13,7 @@ typedef struct
 	union
 	{
 		double num;
-		unsigned int bool : 1; // TODO: Research about the difference between bit-field and _Bool
+		_Bool bool;
 	};
 } Value;
 
