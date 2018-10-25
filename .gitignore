@@ -2,8 +2,3 @@
 bin/
 lib/
 obj/
-
-# Eclipse-specific settings
-.settings/
-.cproject
-.project
