@@ -1,94 +1,91 @@
 ## User-specific settings
-PLATFORM := mingw
+PLATFORM :=
 CC       := gcc
 STD      := c99
 
 ## Makefile
+POLY   := poly
+CONFIG ?= debug
+
+DEBUGMACRO := POLY_DEBUG
+
 CFLAGS  := -std=$(STD) -Wall -Wextra
-LIBS    :=
+LDLIBS  :=
 LDFLAGS :=
 
-POLY   := poly
-CONFIG ?= release
-
 ifeq ($(CONFIG),debug)
-	POLY   := polyd
-	CFLAGS += -O0 -DPOLY_DEBUG -g
+	POLY   := $(POLY)d
+	CFLAGS += -O0 -D$(DEBUGMACRO) -g
 else ifeq ($(CONFIG),release)
 	CFLAGS += -O3
 endif
 
-AR     := ar rcu
+AR     := ar crUu
 RANLIB := ranlib
 RM     := rm -f
 
 ifeq ($(PLATFORM),mingw)
-	EXTAR   := .dll
-	EXTT    := .exe
-	AR      := $(CC) -shared -o
+	AR      := $(CC) -shared -fPIC -o
 	RANLIB  := strip --strip-unneeded
 endif
 
-EXTAR ?= a
-EXTT  ?=
-
-ifeq ($(EXTAR),a)
-	POLY = lib$(POLY)
-endif
-
-OBJDIR = obj/$(CONFIG)
+OBJDIR = obj
+OUTDIR = out
+LIBDIR = lib
 
 VMH := $(wildcard src/vm/*.h)
 VMC := $(wildcard src/vm/*.c)
-VMO := $(addprefix $(OBJDIR)/vm/, $(notdir $(VMC:.c=.o)))
-VMA := lib/$(POLY)$(EXTAR)
+VMO := $(addprefix $(OBJDIR)/$(CONFIG)/vm/, $(notdir $(VMC:.c=.o)))
+VMA := $(LIBDIR)/lib$(POLY)
 
 TESTH := $(wildcard src/test/*.h)
 TESTC := $(wildcard src/test/*.c)
-TESTO := $(addprefix $(OBJDIR)/test/, $(notdir $(TESTC:.c=.o)))
-TESTT := bin/$(POLY)$(EXTT)
+TESTO := $(addprefix $(OBJDIR)/$(CONFIG)/test/, $(notdir $(TESTC:.c=.o)))
+TESTT := $(OUTDIR)/$(POLY)
 
 ALLO := $(VMO) $(TESTO)
 ALLT := $(VMA) $(TESTT)
 
-default:
-	$(MAKE) $(ALLT)
+default: $(ALLT)
 
 echo:
 	@echo "PLATFORM=$(PLATFORM)"
 	@echo "CC=$(CC)"
 	@echo "STD=$(STD)"
 	@echo "CFLAGS=$(CFLAGS)"
-	@echo "LIBS=$(LIBS)"
+	@echo "LDLIBS=$(LDLIBS)"
+	@echo "LDFLAGS=$(LDFLAGS)"
 	@echo "POLY=$(POLY)"
 	@echo "CONFIG=$(CONFIG)"
 	@echo "AR=$(AR)"
 	@echo "RANLIB=$(RANLIB)"
 	@echo "RM=$(RM)"
-	@echo "EXTAR=$(EXTAR)"
 
 clean:
 	$(RM) $(ALLO) $(ALLT)
+	$(RM) -r $(LIBDIR) $(OBJDIR) $(OUTDIR)
 
 # Create library for the VM
-$(VMA): $(VMO)
-	mkdir -p lib
+$(VMA): $(VMO) | $(LIBDIR)/
 	$(AR) $@ $^
 	$(RANLIB) $@
 
 # Create a test executable
-$(TESTT): $(TESTO) $(VMA)
-	mkdir -p bin
-	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $(TESTO) $(VMA) -lm $(LIBS)
+$(TESTT): $(TESTO) $(VMA) | $(OUTDIR)/
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) -lm $(LDLIBS)
 
 # Create objects for the VM
-$(OBJDIR)/vm/%.o: src/vm/%.c $(VMH)
-	mkdir -p $(OBJDIR)/vm
-	$(CC) -c $(CFLAGS) -Isrc/include -Isrc/vm -o $@ $<
+$(OBJDIR)/$(CONFIG)/vm/%.o: src/vm/%.c $(VMH) | $(OBJDIR)/$(CONFIG)/vm/
+	$(CC) -c -o $@ $< $(CFLAGS) -Isrc/include -Isrc/vm 
 
 # Create objects for the test executable
-$(OBJDIR)/test/%.o: src/test/%.c $(TESTH)
-	mkdir -p $(OBJDIR)/test
-	$(CC) -c $(CFLAGS) -Isrc/include -o $@ $<
+$(OBJDIR)/$(CONFIG)/test/%.o: src/test/%.c $(TESTH) | $(OBJDIR)/$(CONFIG)/test/
+	$(CC) -c -o $@ $< $(CFLAGS) -Isrc/include
+
+$(LIBDIR)/ $(OUTDIR)/:
+	mkdir -p $@
+
+$(OBJDIR)/$(CONFIG)/%/:
+	mkdir -p $@
 
 .PHONY: clean
