@@ -16,7 +16,7 @@ static void *defaultAllocator(void *ptr, size_t size)
 #endif
 		return NULL;
 	}
-
+	
 	void *tmp = realloc(ptr, size);
 
 	if (tmp == NULL)
@@ -30,11 +30,11 @@ static void *defaultAllocator(void *ptr, size_t size)
 
 #ifdef POLY_DEBUG
 	if (ptr == NULL)
-		printf("Allocated %d bytes at memory:%lu\n", size, (unsigned long)tmp);
+		printf("Allocated %zu bytes at memory:%lu\n", size, (unsigned long)tmp);
 	else if (ptr == tmp)
-		printf("Allocated %d bytes to memory:%lu\n", size, (unsigned long)tmp);
+		printf("Allocated %zu bytes to memory:%lu\n", size, (unsigned long)tmp);
 	else
-		printf("Reallocated %d bytes from memory:%lu to memory:%lu\n", size, (unsigned long)ptr, (unsigned long)tmp);
+		printf("Reallocated %zu bytes from memory:%lu to memory:%lu\n", size, (unsigned long)ptr, (unsigned long)tmp);
 #endif
 
 	return tmp;
@@ -56,9 +56,7 @@ POLY_API VM *polyNewVM(Config *config)
 	vm->config = (Config*)allocate(NULL, sizeof(Config));
 
 	if (config == NULL)
-	{
 		polyInitConfig(vm->config);
-	}
 	else
 	{
 		allocate(vm->config, 0);
