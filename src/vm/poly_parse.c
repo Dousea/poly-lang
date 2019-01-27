@@ -3,7 +3,7 @@
 #include "poly_vm.h"
 
 // Checks if the lexical token stream is at an allowable form and creates bytecodes
-void parse(VM *vm)
+POLY_LOCAL void parse(VM *vm)
 {
 #ifdef POLY_DEBUG
 	printf("Parsing tokens..\n");

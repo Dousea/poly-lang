@@ -114,7 +114,7 @@ static void mkdbltoken(VM *vm, char c, TokenType first, TokenType second)
 }
 
 // Creates a lexical token stream to be parsed
-void lex(VM *vm)
+POLY_LOCAL void lex(VM *vm)
 {
 #ifdef POLY_DEBUG
 	printf("Creating tokens..\n");
@@ -314,12 +314,11 @@ void lex(VM *vm)
 
 				// Check if the name is reserved word/keyword
 				for (int i = 0; keywords[i].word != NULL; i++)
-				{
 					if (memcmp(&vm->parser.lexer.tokenstart, keywords[i].word, keywords[i].len) == 0)
 					{
-						type = keywords[i].type; break;
+						type = keywords[i].type;
+						break;
 					}
-				}
 
 				mktoken(vm, type);
 
