@@ -18,9 +18,11 @@ POLY_LOCAL void parse(VM *vm)
 
 	while (curtoken->type != TOKEN_EOF)
 	{
+#ifdef POLY_DEBUG
 		printf("Reading token %d with value of %f\n",
 				curtoken->type,
 				(curtoken->value.type == VALUE_NUMBER ? curtoken->value.num : (double)curtoken->value.bool));
+#endif
 
 		switch (curtoken->type)
 		{
