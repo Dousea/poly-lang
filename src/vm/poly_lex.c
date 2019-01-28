@@ -76,7 +76,7 @@ static int lenchar(Lexer *lexer)
 }
 
 // Creates a new token then put it in tokenstream
-static void mktoken(VM *vm, TokenType type)
+static Token* mktoken(VM *vm, TokenType type)
 {
 	// Makes a new token
 	Token token;
@@ -104,10 +104,12 @@ static void mktoken(VM *vm, TokenType type)
 #ifdef POLY_DEBUG
 	printf("Created token %d\n", type);
 #endif
+
+	return (vm->parser.tokenstream + (vm->parser.totaltoken - 1));
 }
 
 // Creates [second] token if next character is [c], otherwise [first] token
-static void mkdbltoken(VM *vm, char c, TokenType first, TokenType second)
+static Token* mkdbltoken(VM *vm, char c, TokenType first, TokenType second)
 {
 	return (conchar(&vm->parser.lexer, c) ? mktoken(vm, second) : mktoken(vm, first));
 }
@@ -201,9 +203,7 @@ POLY_LOCAL void lex(VM *vm)
 
 					indent.len = lenchar(&vm->parser.lexer);
 
-					mktoken(vm, TOKEN_INDENT);
-
-					Token *t = vm->parser.tokenstream + (vm->parser.totaltoken - 1);
+					Token *t = mktoken(vm, TOKEN_INDENT);
 					t->len = 1;
 				}
 				else
@@ -217,9 +217,7 @@ POLY_LOCAL void lex(VM *vm)
 
 						if (len % indent.len == 0)
 						{
-							mktoken(vm, TOKEN_INDENT);
-
-							Token *t = vm->parser.tokenstream + (vm->parser.totaltoken - 1);
+							Token *t = mktoken(vm, TOKEN_INDENT);
 							t->len = len / indent.len;
 						}
 						else // TODO: Gives a lexer error
@@ -296,9 +294,7 @@ POLY_LOCAL void lex(VM *vm)
 					// TODO: Gives a vm->parser.lexer error
 					fprintf(stderr, "Number literal is too large!");
 
-				mktoken(vm, TOKEN_NUMBER);
-
-				Token *t = vm->parser.tokenstream + (vm->parser.totaltoken - 1);
+				Token *t = mktoken(vm, TOKEN_NUMBER);
 				t->value.type = VALUE_NUMBER;
 				t->value.num = num;
 
@@ -319,11 +315,10 @@ POLY_LOCAL void lex(VM *vm)
 						break;
 					}
 
-				mktoken(vm, type);
+				Token *t = mktoken(vm, type);
 
 				if (type == TOKEN_FALSE || type == TOKEN_TRUE)
 				{
-					Token *t = vm->parser.tokenstream + (vm->parser.totaltoken - 1);
 					t->value.type = VALUE_BOOLEAN;
 					t->value.bool = (type == TOKEN_FALSE ? 0 : 1);
 				}
