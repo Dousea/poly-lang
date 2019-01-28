@@ -118,7 +118,7 @@ static Token* mkdbltoken(VM *vm, char c, TokenType first, TokenType second)
 POLY_LOCAL void lex(VM *vm)
 {
 #ifdef POLY_DEBUG
-	printf("Creating tokens..\n");
+	printf("[CREATING TOKENS]\n");
 #endif
 
 	// Is first indentation already occured?

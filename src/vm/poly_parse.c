@@ -6,7 +6,7 @@
 POLY_LOCAL void parse(VM *vm)
 {
 #ifdef POLY_DEBUG
-	printf("Parsing tokens..\n");
+	printf("[PARSING TOKENS]\n");
 #endif
 
 	// Current token that's being consumed
@@ -19,9 +19,14 @@ POLY_LOCAL void parse(VM *vm)
 	while (curtoken->type != TOKEN_EOF)
 	{
 #ifdef POLY_DEBUG
-		printf("Reading token %d with value of %f\n",
-				curtoken->type,
-				(curtoken->value.type == VALUE_NUMBER ? curtoken->value.num : (double)curtoken->value.bool));
+		printf("Reading token %d", curtoken->type);
+
+		if (curtoken->value.type == VALUE_NUMBER)
+			printf(" with value of %f", curtoken->value.num);
+		else if (curtoken->value.type == VALUE_BOOLEAN)
+			printf(" with value of %s", (curtoken->value.bool == 0 ? "false" : "true"));
+
+		printf("\n");
 #endif
 
 		switch (curtoken->type)
