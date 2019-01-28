@@ -87,15 +87,22 @@ static void mktoken(VM *vm, TokenType type)
 	// Keep track on our memory allocation here
 	size_t size = sizeof(Token);
 
-	if (vm->parser.allocatedmemory + size > vm->parser.maxmemory)
+	if ((vm->parser.allocatedmemory + size) > vm->parser.maxmemory)
+	{
+		vm->parser.maxmemory = POLY_ALLOCATE_MEM(vm->parser.maxmemory);
 		vm->parser.tokenstream = vm->config->allocator(vm->parser.tokenstream,
-				(vm->parser.maxmemory = POLY_ALLOCATE_MEM(vm->parser.maxmemory)));
+		                                               vm->parser.maxmemory);
+
+#ifdef POLY_DEBUG
+		printf("Reallocated token stream to %u\n", vm->parser.maxmemory);
+#endif
+	}
 
 	vm->parser.allocatedmemory += size;
 	vm->parser.tokenstream[++vm->parser.totaltoken - 1] = token;
 
 #ifdef POLY_DEBUG
-	printf("Token %d created, allocated memory: %d\n", type, vm->parser.allocatedmemory);
+	printf("Created token %d\n", type);
 #endif
 }
 
