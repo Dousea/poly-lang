@@ -21,9 +21,10 @@ POLY_LOCAL void parse(VM *vm)
 #ifdef POLY_DEBUG
 		printf("Reading token %d", curtoken->type);
 
-		if (curtoken->value.type == VALUE_NUMBER)
+		if (curtoken->type == TOKEN_NUMBER)
 			printf(" with value of %f", curtoken->value.num);
-		else if (curtoken->value.type == VALUE_BOOLEAN)
+		else if (curtoken->type == TOKEN_IDENTIFIER &&
+		         curtoken->value.type == VALUE_BOOLEAN)
 			printf(" with value of %s", (curtoken->value.bool == 0 ? "false" : "true"));
 
 		printf("\n");
