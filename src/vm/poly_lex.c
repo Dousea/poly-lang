@@ -6,6 +6,7 @@
 
 #include "poly_config.h"
 #include "poly_vm.h"
+#include "poly_log.h"
 
 static struct
 {
@@ -94,7 +95,7 @@ static Token* mktoken(VM *vm, TokenType type)
 		                                               vm->parser.maxmemory);
 
 #ifdef POLY_DEBUG
-		printf("Reallocated token stream to %u\n", vm->parser.maxmemory);
+		POLY_IMM_LOG(LEX, "Resized token stream memory to %u bytes\n", vm->parser.maxmemory)
 #endif
 	}
 
@@ -102,7 +103,7 @@ static Token* mktoken(VM *vm, TokenType type)
 	vm->parser.tokenstream[++vm->parser.totaltoken - 1] = token;
 
 #ifdef POLY_DEBUG
-	printf("Created token %d\n", type);
+	POLY_IMM_LOG(LEX, "Created token 0x%02X\n", type)
 #endif
 
 	return (vm->parser.tokenstream + (vm->parser.totaltoken - 1));
@@ -118,7 +119,7 @@ static Token* mkdbltoken(VM *vm, char c, TokenType first, TokenType second)
 POLY_LOCAL void lex(VM *vm)
 {
 #ifdef POLY_DEBUG
-	printf("[CREATING TOKENS]\n");
+	POLY_IMM_LOG(LEX, "Tokenizating...\n")
 #endif
 
 	// Is first indentation already occured?

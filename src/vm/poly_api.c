@@ -5,15 +5,18 @@
 
 #include "poly_config.h"
 #include "poly_vm.h"
+#include "poly_log.h"
 
 static void *defaultAllocator(void *ptr, size_t size)
 {
 	if (size == 0)
 	{
 		free(ptr);
+
 #ifdef POLY_DEBUG
-		printf("memory:%lu freed\n", (unsigned long)ptr);
+		POLY_IMM_LOG(MEM, "Freed memory at 0x%lX\n", (unsigned long)ptr)
 #endif
+
 		return NULL;
 	}
 	
@@ -29,12 +32,16 @@ static void *defaultAllocator(void *ptr, size_t size)
 	}
 
 #ifdef POLY_DEBUG
+	POLY_LOG_START(MEM)
+
 	if (ptr == NULL)
-		printf("Allocated %zu bytes at memory:%lu\n", size, (unsigned long)tmp);
+		POLY_LOG("Allocated %zu bytes at 0x%lX\n", size, (unsigned long)tmp)
 	else if (ptr == tmp)
-		printf("Allocated %zu bytes to memory:%lu\n", size, (unsigned long)tmp);
+		POLY_LOG("Allocated %zu bytes to 0x%lX\n", size, (unsigned long)tmp)
 	else
-		printf("Reallocated %zu bytes from memory:%lu to memory:%lu\n", size, (unsigned long)ptr, (unsigned long)tmp);
+		POLY_LOG("Reallocated %zu bytes from 0x%lX to 0x%lX\n", size, (unsigned long)ptr, (unsigned long)tmp)
+
+	POLY_LOG_END
 #endif
 
 	return tmp;
@@ -42,11 +49,19 @@ static void *defaultAllocator(void *ptr, size_t size)
 
 POLY_API void polyInitConfig(Config *config)
 {
+#ifdef POLY_DEBUG
+	POLY_IMM_LOG(API, "Initializing config...\n")
+#endif
+
 	config->allocator = defaultAllocator;
 }
 
 POLY_API VM *polyNewVM(Config *config)
 {
+#ifdef POLY_DEBUG
+	POLY_IMM_LOG(API, "Creating new VM...\n")
+#endif
+
 	Allocator allocate = defaultAllocator;
 
 	if (config != NULL)
@@ -73,6 +88,10 @@ POLY_API VM *polyNewVM(Config *config)
 
 POLY_API void polyFreeVM(VM *vm)
 {
+#ifdef POLY_DEBUG
+	POLY_IMM_LOG(API, "Freeing VM...\n")
+#endif
+
 	vm->config->allocator(vm->parser.tokenstream, 0);
 	// We use the default allocator because we need to deallocate the config
 	// and the VM
@@ -98,6 +117,10 @@ static Value *pop(VM *vm)
 
 POLY_API void polyInterpret(VM *vm, const char *source)
 {
+#ifdef POLY_DEBUG
+	POLY_IMM_LOG(API, "Interpreting `source`...\n")
+#endif
+
 	vm->parser.lexer.source = vm->parser.lexer.curchar = source;
 
 	lex(vm);
