@@ -99,22 +99,6 @@ POLY_API void polyFreeVM(VM *vm)
 	defaultAllocator(vm, 0);
 }
 
-/*
-static void push(VM *vm, Value *value)
-{
-	assert(vm->stacksize < POLY_MAX_STACK);
-
-	vm->stack[vm->stacksize++] = value;
-}
-
-static Value *pop(VM *vm)
-{
-	assert(vm->stacksize > 0);
-
-	return vm->stack[--vm->stacksize];
-}
-*/
-
 POLY_API void polyInterpret(VM *vm, const char *source)
 {
 #ifdef POLY_DEBUG
@@ -125,23 +109,4 @@ POLY_API void polyInterpret(VM *vm, const char *source)
 
 	lex(vm);
 	parse(vm);
-
-	/*
-	PolyCode *code = parser->codestream;
-
-	while (*code != CODE_EOF)
-	{
-		switch (*code)
-		{
-		case CODE_LITERAL_NUMBER:
-			pushlitnum(vm, code); break;
-		case CODE_LITERAL_TRUE: case CODE_LITERAL_FALSE:
-			pushlitbool(vm); break;
-		default:
-			break;
-		}
-
-		code++;
-	}
-	*/
 }
