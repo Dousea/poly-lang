@@ -80,7 +80,7 @@ POLY_API VM *polyNewVM(Config *config)
 
 	vm->parser.allocatedmemory = 0;
 	vm->parser.maxmemory = POLY_INITIAL_MEM;
-	vm->parser.tokenstream = vm->config->allocator(NULL, POLY_INITIAL_MEM);
+	vm->parser.tokenstream = vm->parser.curtoken = vm->config->allocator(NULL, POLY_INITIAL_MEM);
 	vm->parser.totaltoken = 0;
 
 	return vm;

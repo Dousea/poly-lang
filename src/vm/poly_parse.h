@@ -79,6 +79,7 @@ typedef struct
 {
 	Lexer lexer;
 	Token *tokenstream;
+	const Token *curtoken;
 	unsigned int allocatedmemory;
 	unsigned int maxmemory;
 	unsigned int totaltoken;

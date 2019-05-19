@@ -4,7 +4,8 @@
 typedef enum
 {
 	VALUE_NUMBER,
-	VALUE_BOOLEAN
+	VALUE_BOOLEAN,
+	VALUE_IDENTIFIER
 } ValueType;
 
 typedef struct
@@ -12,9 +13,17 @@ typedef struct
 	ValueType type;
 	union
 	{
+		char* str;
 		double num;
 		_Bool bool;
 	};
 } Value;
+
+typedef struct
+{
+	char* identifier;
+	int len;
+	Value *value;
+} Variable;
 
 #endif

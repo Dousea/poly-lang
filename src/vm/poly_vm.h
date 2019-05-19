@@ -45,10 +45,17 @@
 
 typedef struct
 {
+	Variable* locals[POLY_MAX_LOCALS];
+} Scope;
+
+typedef struct
+{
 	Config *config;
 	Parser parser;
 	unsigned int stacksize;
-	Value *stack[POLY_MAX_STACK];
+	Value* stack[POLY_MAX_STACK];
+	unsigned int curscope;
+	Scope* scope[POLY_MAX_SCOPES];
 } VM;
 
 void lex(VM *vm);
