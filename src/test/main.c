@@ -5,7 +5,11 @@ int main()
 {
 	PolyVM *vm = polyNewVM(NULL);
 
-	polyInterpret(vm, "a = b + c");
+	polyInterpret(vm,
+"# Let's do a simple arithmetic\n\
+one = 1\n\
+two = 2\n\
+three = one + two");
 	polyFreeVM(vm);
 
 	return 0;
