@@ -59,7 +59,7 @@ static void advchar(Lexer *lexer)
 
 // If next character is [c] advance to the character then return 1, otherwise
 // return 0
-static _Bool conchar(Lexer *lexer, char c)
+static _Bool nextcharadv(Lexer *lexer, char c)
 {
 	if (nextchar(lexer) == c)
 	{
@@ -112,7 +112,7 @@ static Token* mktoken(VM *vm, TokenType type)
 // Creates [second] token if next character is [c], otherwise [first] token
 static Token* mkdbltoken(VM *vm, char c, TokenType first, TokenType second)
 {
-	return (conchar(&vm->parser.lexer, c) ? mktoken(vm, second) : mktoken(vm, first));
+	return (nextcharadv(&vm->parser.lexer, c) ? mktoken(vm, second) : mktoken(vm, first));
 }
 
 // Creates a lexical token stream to be parsed
@@ -169,7 +169,7 @@ POLY_LOCAL void lex(VM *vm)
 		case ':':
 			mkdbltoken(vm, c, TOKEN_CLN, TOKEN_CLNCLN); break;
 		case '.': // TODO: Maybe reads number with no leading zero (e.g. .75)? (low priority)
-			if (conchar(&vm->parser.lexer, c))
+			if (nextcharadv(&vm->parser.lexer, c))
 				mkdbltoken(vm, c, TOKEN_DOTDOT, TOKEN_DOTDOTDOT);
 			else
 				mktoken(vm, TOKEN_DOT);
@@ -232,20 +232,20 @@ POLY_LOCAL void lex(VM *vm)
 			break;
 		case '#':
 			// Multi-line comment -> #:<comment>:#
-			if (conchar(&vm->parser.lexer, ':'))
+			if (nextcharadv(&vm->parser.lexer, ':'))
 			{
 				int nested = 0;
 
 				while (nextchar(&vm->parser.lexer) != '\0')
 				{
-					if (conchar(&vm->parser.lexer, '#'))
+					if (nextcharadv(&vm->parser.lexer, '#'))
 					{
-						if (conchar(&vm->parser.lexer, ':'))
+						if (nextcharadv(&vm->parser.lexer, ':'))
 							nested++;
 					}
-					else if (conchar(&vm->parser.lexer, ':'))
+					else if (nextcharadv(&vm->parser.lexer, ':'))
 					{
-						if (conchar(&vm->parser.lexer, '#'))
+						if (nextcharadv(&vm->parser.lexer, '#'))
 							nested--;
 					}
 
@@ -271,14 +271,14 @@ POLY_LOCAL void lex(VM *vm)
 				while (isdigit(nextchar(&vm->parser.lexer)))
 					advchar(&vm->parser.lexer);
 
-				if (conchar(&vm->parser.lexer, '.'))
+				if (nextcharadv(&vm->parser.lexer, '.'))
 					if (isdigit(nextchar(&vm->parser.lexer)))
 						while (isdigit(nextchar(&vm->parser.lexer)))
 							advchar(&vm->parser.lexer);
 
-				if (conchar(&vm->parser.lexer, 'e') || conchar(&vm->parser.lexer, 'E'))
+				if (nextcharadv(&vm->parser.lexer, 'e') || nextcharadv(&vm->parser.lexer, 'E'))
 				{
-					conchar(&vm->parser.lexer, '-');
+					nextcharadv(&vm->parser.lexer, '-');
 
 					if (!isdigit(nextchar(&vm->parser.lexer)))
 						// TODO: Gives a vm->parser.lexer error
