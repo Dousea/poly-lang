@@ -6,17 +6,17 @@
 
 static const Token* curtoken(Parser *parser)
 {
-	return parser->curtoken;
+	return parser->tokenstream.current;
 }
 
 // Advances to the next token
 static void advtoken(Parser *parser)
 {
 #ifdef POLY_DEBUG
-	POLY_IMM_LOG(PRS, "Consuming token 0x%02X...\n", parser->curtoken->type)
+	POLY_IMM_LOG(PRS, "Consuming token 0x%02X...\n", parser->tokenstream.current->type)
 #endif
 
-	parser->curtoken++;
+	parser->tokenstream.current++;
 }
 
 // If current token type is [t] advance to the token then return 1, otherwise
@@ -41,16 +41,11 @@ static _Bool value(VM *vm)
 	case TOKEN_FALSE:
 	case TOKEN_TRUE:
 	case TOKEN_NUMBER:
-#ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got literal.\n")
-#endif
-
-		advtoken(&vm->parser);
-		return 1;
 	case TOKEN_IDENTIFIER:
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got identifier.\n")
+		POLY_IMM_LOG(PRS, "Got value.\n")
 #endif
+		
 
 		advtoken(&vm->parser);
 		return 1;
@@ -119,13 +114,9 @@ static _Bool expression(VM *vm)
 			}
 		}
 		else
-		{
-#ifdef POLY_DEBUG
-			POLY_IMM_LOG(PRS, "Got value.\n")
-#endif
-
+			// Here we got a value or an expression, but no binary operator...
+			// it's still a valid expression.
 			return 1;
-		}
 		
 
 	if (unaryoperator(vm))
