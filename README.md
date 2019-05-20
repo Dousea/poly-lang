@@ -1,9 +1,12 @@
 # Processing
 **1) Source that's being interpreted;**
+
 ```
 five = 1 + 2 * 2
 ```
+
 **2) Will create these tokens;**
+
 Tokens | Character
 --- | ---
 `TOKEN_IDENTIFIER` | `five`
@@ -13,7 +16,9 @@ Tokens | Character
 `TOKEN_NUMBER` | `2`
 `TOKEN_ASTERISK` | `*`
 `TOKEN_NUMBER` | `2`
+
 **3) And generating this kind of tree;**
+
 ```
       `=`
       / \
@@ -23,7 +28,9 @@ Tokens | Character
             / \
          `2`   `2`
 ```
+
 **4) By the tree we can create the bytecodes to be executed.**
+
 Bytecode | Literal | Stack
 --- | :---: | ---:
 `PUSH_IDENTIFIER` | `five` | [`five`]
@@ -35,6 +42,7 @@ Bytecode | Literal | Stack
 `ASSIGN` | | []
 
  # Rules
+ 
 ```
 varlist `=` explist
 explist = exp {`,` exp}
