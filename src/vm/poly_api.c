@@ -78,10 +78,11 @@ POLY_API VM *polyNewVM(Config *config)
 		memcpy(vm->config, config, sizeof(Config));
 	}
 
-	vm->parser.allocatedmemory = 0;
-	vm->parser.maxmemory = POLY_INITIAL_MEM;
-	vm->parser.tokenstream = vm->parser.curtoken = vm->config->allocator(NULL, POLY_INITIAL_MEM);
-	vm->parser.totaltoken = 0;
+	vm->parser.tokenstream.allocatedmemory = 0;
+	vm->parser.tokenstream.maxmemory = POLY_INITIAL_MEM;
+	vm->parser.tokenstream.stream =
+		vm->parser.tokenstream.current = vm->config->allocator(NULL, POLY_INITIAL_MEM);
+	vm->parser.tokenstream.current = 0;
 
 	return vm;
 }
@@ -92,7 +93,7 @@ POLY_API void polyFreeVM(VM *vm)
 	POLY_IMM_LOG(API, "Freeing VM...\n")
 #endif
 
-	vm->config->allocator(vm->parser.tokenstream, 0);
+	vm->config->allocator(vm->parser.tokenstream.stream, 0);
 	// We use the default allocator because we need to deallocate the config
 	// and the VM
 	defaultAllocator(vm->config, 0);

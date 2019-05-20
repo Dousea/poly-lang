@@ -88,25 +88,25 @@ static Token* mktoken(VM *vm, TokenType type)
 	// Keep track on our memory allocation here
 	size_t size = sizeof(Token);
 
-	if ((vm->parser.allocatedmemory + size) > vm->parser.maxmemory)
+	if ((vm->parser.tokenstream.allocatedmemory + size) > vm->parser.tokenstream.maxmemory)
 	{
-		vm->parser.maxmemory = POLY_ALLOCATE_MEM(vm->parser.maxmemory);
-		vm->parser.tokenstream = vm->config->allocator(vm->parser.tokenstream,
-		                                               vm->parser.maxmemory);
+		vm->parser.tokenstream.maxmemory = POLY_ALLOCATE_MEM(vm->parser.tokenstream.maxmemory);
+		vm->parser.tokenstream.stream = vm->config->allocator(vm->parser.tokenstream.stream,
+		                                               vm->parser.tokenstream.maxmemory);
 
 #ifdef POLY_DEBUG
 		POLY_IMM_LOG(LEX, "Resized token stream memory to %u bytes\n", vm->parser.maxmemory)
 #endif
 	}
 
-	vm->parser.allocatedmemory += size;
-	vm->parser.tokenstream[++vm->parser.totaltoken - 1] = token;
+	vm->parser.tokenstream.allocatedmemory += size;
+	vm->parser.tokenstream.stream[++vm->parser.tokenstream.total - 1] = token;
 
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(LEX, "Created token 0x%02X\n", type)
 #endif
 
-	return (vm->parser.tokenstream + (vm->parser.totaltoken - 1));
+	return (vm->parser.tokenstream.stream + (vm->parser.tokenstream.total - 1));
 }
 
 // Creates [second] token if next character is [c], otherwise [first] token

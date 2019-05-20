@@ -77,12 +77,18 @@ typedef struct
 
 typedef struct
 {
-	Lexer lexer;
-	Token *tokenstream;
-	const Token *curtoken;
+	Token *stream;
+	const Token *current;
+	unsigned int total;
 	unsigned int allocatedmemory;
 	unsigned int maxmemory;
-	unsigned int totaltoken;
+} TokenStream;
+
+
+typedef struct
+{
+	Lexer lexer;
+	TokenStream tokenstream;
 } Parser;
 
 #endif
