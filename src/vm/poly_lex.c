@@ -95,7 +95,7 @@ static Token* mktoken(VM *vm, TokenType type)
 		                                               vm->parser.tokenstream.maxmemory);
 
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(LEX, "Resized token stream memory to %u bytes\n", vm->parser.maxmemory)
+		POLY_IMM_LOG(LEX, "Resized token stream memory to %u bytes\n", vm->parser.tokenstream.maxmemory)
 #endif
 	}
 
