@@ -77,13 +77,12 @@ typedef struct
 
 typedef struct
 {
-	Token *stream;
-	const Token *current;
+	Token* stream;
+	Token* current;
 	unsigned int total;
 	unsigned int allocatedmemory;
 	unsigned int maxmemory;
 } TokenStream;
-
 
 typedef struct
 {
