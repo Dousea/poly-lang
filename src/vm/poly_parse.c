@@ -165,7 +165,7 @@ static _Bool expression(VM *vm)
 	if (value(vm) || expression(vm))
 		if (binaryoperator(vm))
 		{
-			if (value(vm) || expression(vm))
+			if (expression(vm))
 			{
 #ifdef POLY_DEBUG
 				POLY_IMM_LOG(PRS, "Got binary expression\n")
