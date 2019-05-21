@@ -300,4 +300,6 @@ POLY_LOCAL void parse(VM *vm)
 			break;
 		}
 	}
+	
+	mkcode(vm, INST_END, NULL);
 }

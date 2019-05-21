@@ -14,7 +14,9 @@ typedef enum
     
     INST_UN_NEG,
     
-    INST_ASSIGN
+    INST_ASSIGN,
+
+    INST_END,
 } Instruction;
 
 #define CODE_INST  0
@@ -22,7 +24,7 @@ typedef enum
 
 typedef struct
 {
-    char type : 1;
+    unsigned char type : 1;
     union {
         const Value* value;
         Instruction inst;
