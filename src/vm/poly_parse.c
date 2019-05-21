@@ -2,8 +2,10 @@
 #include <assert.h>
 
 #include "poly_vm.h"
+#include "poly_code.h"
 #include "poly_log.h"
 
+// Gets current token that's being parsed
 static const Token* curtoken(Parser *parser)
 {
 	return parser->tokenstream.current;
@@ -32,6 +34,51 @@ static _Bool curtokenadv(Parser *parser, TokenType type)
 		return 0;
 }
 
+// Allocates [code] in the codestream
+static Code* allocatecode(VM *vm, Code code)
+{
+	size_t size = sizeof(Code);
+
+	if ((vm->codestream.allocatedmemory + size) > vm->codestream.maxmemory)
+	{
+		vm->codestream.maxmemory = POLY_ALLOCATE_MEM(vm->codestream.maxmemory);
+		vm->codestream.stream = vm->config->allocator(vm->codestream.stream,
+		                                               vm->codestream.maxmemory);
+
+#ifdef POLY_DEBUG
+		POLY_IMM_LOG(PRS, "Resized code stream memory to %u bytes\n", vm->codestream.maxmemory)
+#endif
+	}
+
+	vm->codestream.allocatedmemory += size;
+	vm->codestream.stream[++vm->codestream.size - 1] = code;
+
+	return (vm->codestream.stream + (vm->codestream.size - 1));
+}
+
+// Creates a new code then put it in codestream
+static void mkcode(VM *vm, Instruction inst, const Value* value)
+{
+#ifdef POLY_DEBUG
+	POLY_IMM_LOG(PRS, "Creating code instruction 0x%02X...\n", inst)
+#endif
+
+	Code code;
+	code.type = CODE_INST;
+	code.inst = inst;
+
+	allocatecode(vm, code);
+
+	if (inst == INST_VALUE)
+	{
+		Code code;
+		code.type = CODE_VALUE;
+		code.value = value;
+
+		allocatecode(vm, code);
+	}
+}
+
 /***** GRAMMAR RULES *****/
 
 static _Bool value(VM *vm)
@@ -43,10 +90,10 @@ static _Bool value(VM *vm)
 	case TOKEN_NUMBER:
 	case TOKEN_IDENTIFIER:
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got value.\n")
+		POLY_IMM_LOG(PRS, "Got value\n")
 #endif
 		
-
+		mkcode(vm, INST_VALUE, &curtoken(&vm->parser)->value);
 		advtoken(&vm->parser);
 		return 1;
 	default:
@@ -58,17 +105,29 @@ static _Bool value(VM *vm)
 
 static _Bool binaryoperator(VM *vm)
 {
-	switch (curtoken(&vm->parser)->type)
+	TokenType type = curtoken(&vm->parser)->type;
+
+	switch (type)
 	{
 	case TOKEN_PLUS:
 	case TOKEN_MINUS:
 	case TOKEN_ASTERISK:
 	case TOKEN_SLASH:
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got binary operator.\n")
+		POLY_IMM_LOG(PRS, "Got binary operator\n")
 #endif
+		
+		if (type == TOKEN_PLUS)
+			mkcode(vm, INST_BIN_ADD, NULL);
+		else if (type == TOKEN_MINUS)
+			mkcode(vm, INST_BIN_SUB, NULL);
+		else if (type == TOKEN_ASTERISK)
+			mkcode(vm, INST_BIN_MUL, NULL);
+		else
+			mkcode(vm, INST_BIN_DIV, NULL);
 
 		advtoken(&vm->parser);
+
 		return 1;
 	default:
 		break;
@@ -83,10 +142,12 @@ static _Bool unaryoperator(VM *vm)
 	{
 	case TOKEN_MINUS:
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got unary operator.\n")
+		POLY_IMM_LOG(PRS, "Got unary operator\n")
 #endif
 
+		mkcode(vm, INST_UN_NEG, NULL);
 		advtoken(&vm->parser);
+
 		return 1;
 	default:
 		break;
@@ -107,7 +168,7 @@ static _Bool expression(VM *vm)
 			if (value(vm) || expression(vm))
 			{
 #ifdef POLY_DEBUG
-				POLY_IMM_LOG(PRS, "Got binary expression.\n")
+				POLY_IMM_LOG(PRS, "Got binary expression\n")
 #endif
 
 				return 1;
@@ -123,7 +184,7 @@ static _Bool expression(VM *vm)
 		if (value(vm) || expression(vm))
 		{
 #ifdef POLY_DEBUG
-			POLY_IMM_LOG(PRS, "Got unary expression.\n")
+			POLY_IMM_LOG(PRS, "Got unary expression\n")
 #endif
 
 			return 1;
@@ -157,7 +218,7 @@ static _Bool variable(VM *vm)
 	if (curtoken(&vm->parser)->type == TOKEN_IDENTIFIER)
 	{
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got variable.\n")
+		POLY_IMM_LOG(PRS, "Got variable\n")
 #endif
 
 		advtoken(&vm->parser);
@@ -198,8 +259,10 @@ static _Bool statement(VM *vm)
 		expressionlist(vm))
 	{
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got assignment.\n")
+		POLY_IMM_LOG(PRS, "Got assignment\n")
 #endif
+
+		mkcode(vm, INST_ASSIGN, NULL);
 
 		return 1;
 	}

@@ -82,7 +82,11 @@ POLY_API VM *polyNewVM(Config *config)
 	vm->parser.tokenstream.maxmemory = POLY_INITIAL_MEM;
 	vm->parser.tokenstream.stream =
 		vm->parser.tokenstream.current = vm->config->allocator(NULL, POLY_INITIAL_MEM);
-	vm->parser.tokenstream.current = 0;
+	vm->parser.tokenstream.total = 0;
+
+	vm->codestream.allocatedmemory = 0;
+	vm->codestream.maxmemory = POLY_INITIAL_MEM;
+	vm->codestream.stream = vm->codestream.current = vm->config->allocator(NULL, POLY_INITIAL_MEM);
 
 	return vm;
 }
@@ -110,4 +114,5 @@ POLY_API void polyInterpret(VM *vm, const char *source)
 
 	lex(vm);
 	parse(vm);
+	interpret(vm);
 }

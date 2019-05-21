@@ -3,6 +3,7 @@
 
 #include "poly_config.h"
 #include "poly_parse.h"
+#include "poly_code.h"
 
 #if defined _WIN32 || defined __CYGWIN__
 	#define POLY_HELPER_DLL_IMPORT __declspec(dllimport)
@@ -50,15 +51,33 @@ typedef struct
 
 typedef struct
 {
+	Value* current;
+	unsigned int size;
+	Value* value[POLY_MAX_STACK];
+} Stack;
+
+typedef struct
+{
+	Code* current;
+	Code* stream;
+	unsigned int allocatedmemory;
+	unsigned int maxmemory;
+	unsigned int size;
+} CodeStream;
+
+typedef struct
+{
 	Config *config;
 	Parser parser;
-	unsigned int stacksize;
-	Value* stack[POLY_MAX_STACK];
-	unsigned int curscope;
+	Stack stack;
+	CodeStream codestream;
+
+	Scope* curscope;
 	Scope* scope[POLY_MAX_SCOPES];
 } VM;
 
 void lex(VM *vm);
 void parse(VM *vm);
+void interpret(VM *vm);
 
 #endif

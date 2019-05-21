@@ -6,6 +6,7 @@ typedef enum
     POLY_MSG_API,
     POLY_MSG_LEX,
     POLY_MSG_PRS,
+    POLY_MSG_VMA,
     POLY_MSG_MEM
 } MessageType;
 
