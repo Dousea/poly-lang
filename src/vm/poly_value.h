@@ -23,7 +23,7 @@ typedef struct
 {
 	char* identifier;
 	int len;
-	Value *value;
+	Value* value;
 } Variable;
 
 #endif
