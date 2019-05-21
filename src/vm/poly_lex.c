@@ -323,6 +323,14 @@ POLY_LOCAL void lex(VM *vm)
 					t->value.type = VALUE_BOOLEAN;
 					t->value.bool = (type == TOKEN_FALSE ? 0 : 1);
 				}
+				else if (type == TOKEN_IDENTIFIER)
+				{
+					char str[t->len+1];
+					strncpy(str, t->start, t->len);
+					str[t->len+1] = '\0';
+					t->value.str = str;
+					t->value.type = VALUE_IDENTIFIER;
+				}
 
 				break;
 			}
