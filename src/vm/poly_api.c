@@ -98,6 +98,7 @@ POLY_API void polyFreeVM(VM *vm)
 #endif
 
 	vm->config->allocator(vm->parser.tokenstream.stream, 0);
+	vm->config->allocator(vm->codestream.stream, 0);
 	// We use the default allocator because we need to deallocate the config
 	// and the VM
 	defaultAllocator(vm->config, 0);
