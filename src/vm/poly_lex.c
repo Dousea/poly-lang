@@ -10,7 +10,7 @@
 #include "poly_vm.h"
 #include "poly_log.h"
 
-static void throwerr(Lexer* lexer, const char* fmt, ...)
+static void throwerr(poly_Lexer *lexer, const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -21,58 +21,58 @@ static void throwerr(Lexer* lexer, const char* fmt, ...)
 	exit(EXIT_FAILURE);
 }
 
-static struct
+static struct poly_Keyword
 {
-	const char* word;
-	TokenType type;
+	const char *word;
+	poly_TokenType type;
 	int len;
-} keywords[] = {
-		{ "and",         TOKEN_AND,         3  },
-		{ "break",       TOKEN_BREAK,       5  },
-		{ "continue",    TOKEN_CONTINUE,    8  },
-		{ "do",          TOKEN_DO,          2  },
-		{ "else",        TOKEN_ELSE,        4  },
-		{ "false",       TOKEN_FALSE,       5  },
-		{ "for",         TOKEN_FOR,         3  },
-		{ "function",    TOKEN_FUNCTION,    8  },
-		{ "if",          TOKEN_IF,          2  },
-		{ "not",         TOKEN_NOT,         3  },
-		{ "null",        TOKEN_NULL,        4  },
-		{ "or",          TOKEN_OR,          2  },
-		{ "repeat",      TOKEN_REPEAT,      6  },
-		{ "return",      TOKEN_RETURN,      6  },
-		{ "true",        TOKEN_TRUE,        4  },
-		{ "until",       TOKEN_UNTIL,       5  },
-		{ "while",       TOKEN_WHILE,       5  }
+} keyword[] = {
+		{ "and",         POLY_TOKEN_AND,         3  },
+		{ "break",       POLY_TOKEN_BREAK,       5  },
+		{ "continue",    POLY_TOKEN_CONTINUE,    8  },
+		{ "do",          POLY_TOKEN_DO,          2  },
+		{ "else",        POLY_TOKEN_ELSE,        4  },
+		{ "false",       POLY_TOKEN_FALSE,       5  },
+		{ "for",         POLY_TOKEN_FOR,         3  },
+		{ "function",    POLY_TOKEN_FUNCTION,    8  },
+		{ "if",          POLY_TOKEN_IF,          2  },
+		{ "not",         POLY_TOKEN_NOT,         3  },
+		{ "null",        POLY_TOKEN_NULL,        4  },
+		{ "or",          POLY_TOKEN_OR,          2  },
+		{ "repeat",      POLY_TOKEN_REPEAT,      6  },
+		{ "return",      POLY_TOKEN_RETURN,      6  },
+		{ "true",        POLY_TOKEN_TRUE,        4  },
+		{ "until",       POLY_TOKEN_UNTIL,       5  },
+		{ "while",       POLY_TOKEN_WHILE,       5  }
 };
 
 // Gets current character that's being read
-static char curchar(Lexer *lexer)
+static char curchar(poly_Lexer *lexer)
 {
 	return *lexer->curchar;
 }
 
 // Gets next character that will be read
-static char nextchar(Lexer *lexer)
+static char nextchar(poly_Lexer *lexer)
 {
 	return *(lexer->curchar + 1);
 }
 
 // Gets previous character that's already read
-static char prevchar(Lexer *lexer)
+static char prevchar(poly_Lexer *lexer)
 {
 	return *(lexer->curchar - 1);
 }
 
 // Advances to the next character
-static void advchar(Lexer *lexer)
+static void advchar(poly_Lexer *lexer)
 {
 	lexer->curchar++;
 }
 
 // If next character is [c] advance to the character then return 1, otherwise
 // return 0
-static _Bool nextcharadv(Lexer *lexer, char c)
+static _Bool nextcharadv(poly_Lexer *lexer, char c)
 {
 	if (nextchar(lexer) == c)
 	{
@@ -84,16 +84,16 @@ static _Bool nextcharadv(Lexer *lexer, char c)
 }
 
 // Gets length from token's start position to current character
-static size_t lenchar(Lexer *lexer)
+static size_t lenchar(poly_Lexer *lexer)
 {
 	return (size_t)(lexer->curchar - lexer->tokenstart) + 1;
 }
 
 // Creates a new token then put it in tokenstream
-static Token* mktoken(VM *vm, TokenType type)
+static poly_Token *mktoken(poly_VM *vm, poly_TokenType type)
 {
 	// Makes a new token
-	Token token;
+	poly_Token token;
 	token.type = type;
 	token.start = vm->parser.lexer.tokenstart;
 	
@@ -107,20 +107,20 @@ static Token* mktoken(VM *vm, TokenType type)
 	token.len = len;
 
 	// Keep track on our memory allocation here
-	size_t size = sizeof(Token);
+	size_t size = sizeof(poly_Token);
 
-	if ((vm->parser.tokenstream.allocatedmemory + size) > vm->parser.tokenstream.maxmemory)
+	if ((vm->parser.tokenstream.allotedmem + size) > vm->parser.tokenstream.maxmem)
 	{
-		vm->parser.tokenstream.maxmemory = POLY_ALLOCATE_MEM(vm->parser.tokenstream.maxmemory);
-		vm->parser.tokenstream.stream = vm->config->allocator(vm->parser.tokenstream.stream,
-		                                               vm->parser.tokenstream.maxmemory);
+		vm->parser.tokenstream.maxmem = POLY_ALLOC_MEM(vm->parser.tokenstream.maxmem);
+		vm->parser.tokenstream.stream = vm->config->alloc(vm->parser.tokenstream.stream,
+		                                                  vm->parser.tokenstream.maxmem);
 
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(MEM, "Resized token stream memory to %zu bytes\n", vm->parser.tokenstream.maxmemory)
+		POLY_IMM_LOG(MEM, "Resized token stream memory to %zu bytes\n", vm->parser.tokenstream.maxmem)
 #endif
 	}
 
-	vm->parser.tokenstream.allocatedmemory += size;
+	vm->parser.tokenstream.allotedmem += size;
 	vm->parser.tokenstream.stream[++vm->parser.tokenstream.size - 1] = token;
 
 #ifdef POLY_DEBUG
@@ -133,13 +133,13 @@ static Token* mktoken(VM *vm, TokenType type)
 }
 
 // Creates [second] token if next character is [c], otherwise [first] token
-static Token* mkterntoken(VM *vm, char c, TokenType first, TokenType second)
+static poly_Token *mkterntoken(poly_VM *vm, char c, poly_TokenType first, poly_TokenType second)
 {
 	return (nextcharadv(&vm->parser.lexer, c) ? mktoken(vm, second) : mktoken(vm, first));
 }
 
 // Creates a lexical token stream to be parsed
-POLY_LOCAL void lex(VM *vm)
+POLY_LOCAL void lex(poly_VM *vm)
 {
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(LEX, "Tokenizating...\n")
@@ -164,59 +164,59 @@ POLY_LOCAL void lex(VM *vm)
 		switch (c)
 		{
 		case '(':
-			mktoken(vm, TOKEN_OPENRNDBRCKT); break;
+			mktoken(vm, POLY_TOKEN_OPENRNDBRCKT); break;
 		case ')':
-			mktoken(vm, TOKEN_CLOSERNDBRCKT); break;
+			mktoken(vm, POLY_TOKEN_CLOSERNDBRCKT); break;
 		case '{':
-			mktoken(vm, TOKEN_OPENCRLYBRCKT); break;
+			mktoken(vm, POLY_TOKEN_OPENCRLYBRCKT); break;
 		case '}':
-			mktoken(vm, TOKEN_CLOSECRLYBRCKT); break;
+			mktoken(vm, POLY_TOKEN_CLOSECRLYBRCKT); break;
 		case '[':
-			mktoken(vm, TOKEN_OPENSQRBRCKT); break;
+			mktoken(vm, POLY_TOKEN_OPENSQRBRCKT); break;
 		case ']':
-			mktoken(vm, TOKEN_CLOSESQRBRCKT); break;
+			mktoken(vm, POLY_TOKEN_CLOSESQRBRCKT); break;
 		case '=':
-			mkterntoken(vm, c, TOKEN_EQ, TOKEN_EQEQ); break;
+			mkterntoken(vm, c, POLY_TOKEN_EQ, POLY_TOKEN_EQEQ); break;
 		case '<':
-			mkterntoken(vm, '=', TOKEN_LT, TOKEN_LTEQ); break;
+			mkterntoken(vm, '=', POLY_TOKEN_LT, POLY_TOKEN_LTEQ); break;
 		case '>':
-			mkterntoken(vm, '=', TOKEN_GT, TOKEN_GTEQ); break;
+			mkterntoken(vm, '=', POLY_TOKEN_GT, POLY_TOKEN_GTEQ); break;
 		case '@':
-			mktoken(vm, TOKEN_ATSGN); break;
+			mktoken(vm, POLY_TOKEN_ATSGN); break;
 		case '%':
-			mktoken(vm, TOKEN_PRCNTSGN); break;
+			mktoken(vm, POLY_TOKEN_PRCNTSGN); break;
 		case '?':
-			mktoken(vm, TOKEN_QSTNMRK); break;
+			mktoken(vm, POLY_TOKEN_QSTNMRK); break;
 		case '!':
-			mkterntoken(vm, '=', TOKEN_EXCLMTNMRK, TOKEN_UNEQ); break;
+			mkterntoken(vm, '=', POLY_TOKEN_EXCLMTNMRK, POLY_TOKEN_UNEQ); break;
 		case '\'': case '"': // TODO: Reads a string
 			break;
 		case ':':
-			mkterntoken(vm, c, TOKEN_CLN, TOKEN_CLNCLN); break;
+			mkterntoken(vm, c, POLY_TOKEN_CLN, POLY_TOKEN_CLNCLN); break;
 		case '.': // TODO: Maybe reads number with no leading zero (e.g. .75)? (low priority)
 			if (nextcharadv(&vm->parser.lexer, c))
-				mkterntoken(vm, c, TOKEN_DOTDOT, TOKEN_DOTDOTDOT);
+				mkterntoken(vm, c, POLY_TOKEN_DOTDOT, POLY_TOKEN_DOTDOTDOT);
 			else
-				mktoken(vm, TOKEN_DOT);
+				mktoken(vm, POLY_TOKEN_DOT);
 
 			break;
 		case ',':
-			mktoken(vm, TOKEN_COMMA); break;
+			mktoken(vm, POLY_TOKEN_COMMA); break;
 		case '+':
-			mktoken(vm, TOKEN_PLUS); break;
+			mktoken(vm, POLY_TOKEN_PLUS); break;
 		case '-':
-			mktoken(vm, TOKEN_MINUS); break;
+			mktoken(vm, POLY_TOKEN_MINUS); break;
 		case '*':
-			mktoken(vm, TOKEN_ASTERISK); break;
+			mktoken(vm, POLY_TOKEN_ASTERISK); break;
 		case '/':
-			mktoken(vm, TOKEN_SLASH); break;
+			mktoken(vm, POLY_TOKEN_SLASH); break;
 		case '^':
-			mktoken(vm, TOKEN_CARET); break;
+			mktoken(vm, POLY_TOKEN_CARET); break;
 		case '\\': // TODO: Support for escape sequences (e.g. unicode) (low priority)
-			mktoken(vm, TOKEN_BACKSLASH); break;
+			mktoken(vm, POLY_TOKEN_BACKSLASH); break;
 		case '\n':
 			vm->parser.lexer.curln++;
-			mktoken(vm, TOKEN_NEWLINE);
+			mktoken(vm, POLY_TOKEN_NEWLINE);
 			break;
 		case ' ': case '\t':
 			if (prevchar(&vm->parser.lexer) == '\n')
@@ -231,7 +231,7 @@ POLY_LOCAL void lex(VM *vm)
 
 					indent.len = lenchar(&vm->parser.lexer);
 
-					Token *t = mktoken(vm, TOKEN_INDENT);
+					poly_Token *t = mktoken(vm, POLY_TOKEN_INDENT);
 					t->len = 1;
 				}
 				else
@@ -245,7 +245,7 @@ POLY_LOCAL void lex(VM *vm)
 
 						if (len % indent.len == 0)
 						{
-							Token *t = mktoken(vm, TOKEN_INDENT);
+							poly_Token *t = mktoken(vm, POLY_TOKEN_INDENT);
 							t->len = len / indent.len;
 						}
 						else
@@ -320,9 +320,9 @@ POLY_LOCAL void lex(VM *vm)
 				if (errno == ERANGE)
 					throwerr(&vm->parser.lexer, "number literal is too large");
 
-				Token *t = mktoken(vm, TOKEN_NUMBER);
-				t->value.type = VALUE_NUMBER;
-				t->value.num = num;
+				poly_Token *t = mktoken(vm, POLY_TOKEN_NUMBER);
+				t->val.type = POLY_VAL_NUM;
+				t->val.num = num;
 
 				break;
 			}
@@ -331,46 +331,46 @@ POLY_LOCAL void lex(VM *vm)
 				while (isalnum(nextchar(&vm->parser.lexer)) || nextchar(&vm->parser.lexer) == '_')
 					advchar(&vm->parser.lexer);
 
-				TokenType type = TOKEN_IDENTIFIER;
+				poly_TokenType type = POLY_TOKEN_IDENTIFIER;
 
 				// Check if the name is reserved word/keyword
-				for (int i = 0; keywords[i].word != NULL; i++)
-					if (memcmp(&vm->parser.lexer.tokenstart, keywords[i].word, keywords[i].len) == 0)
+				for (int i = 0; keyword[i].word != NULL; i++)
+					if (memcmp(&vm->parser.lexer.tokenstart, keyword[i].word, keyword[i].len) == 0)
 					{
-						type = keywords[i].type;
+						type = keyword[i].type;
 						break;
 					}
 
-				Token* t = mktoken(vm, type);
+				poly_Token *t = mktoken(vm, type);
 
-				if (type == TOKEN_FALSE || type == TOKEN_TRUE)
+				if (type == POLY_TOKEN_FALSE || type == POLY_TOKEN_TRUE)
 				{
-					t->value.type = VALUE_BOOLEAN;
-					t->value.bool = (type == TOKEN_FALSE ? 0 : 1);
+					t->val.type = POLY_VAL_BOOL;
+					t->val.bool = (type == POLY_TOKEN_FALSE ? 0 : 1);
 				}
-				else if (type == TOKEN_IDENTIFIER)
+				else if (type == POLY_TOKEN_IDENTIFIER)
 				{
-					t->value.str = vm->config->allocator(NULL, CHAR_BIT * sizeof(t->len));
-					strncpy(t->value.str, t->start, t->len);
-					t->value.str[t->len] = '\0';
-					t->value.type = VALUE_IDENTIFIER;
+					t->val.str = vm->config->alloc(NULL, CHAR_BIT * sizeof(t->len));
+					strncpy(t->val.str, t->start, t->len);
+					t->val.str[t->len] = '\0';
+					t->val.type = POLY_VAL_ID;
 				}
 
 				break;
 			}
 
-			mktoken(vm, TOKEN_UNKNOWN);
+			mktoken(vm, POLY_TOKEN_UNKNOWN);
 		}
 
 		advchar(&vm->parser.lexer);
 	}
 
-	mktoken(vm, TOKEN_EOF);
+	mktoken(vm, POLY_TOKEN_EOF);
 
 
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(LEX, "Allocated %zu bytes for %zu tokens\n",
-		vm->parser.tokenstream.allocatedmemory,
+		vm->parser.tokenstream.allotedmem,
 		vm->parser.tokenstream.size)
 #endif
 }

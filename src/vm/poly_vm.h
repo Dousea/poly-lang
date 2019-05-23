@@ -34,50 +34,50 @@
 #endif // POLY_DLL
 
 // Maximum values inside stack of VM
-#define POLY_MAX_STACK  		128
+#define POLY_MAX_STACK  	128
 // Maximum scopes
-#define POLY_MAX_SCOPES 		8
+#define POLY_MAX_SCOPES 	8
 // Maximum locals inside a scope level
-#define POLY_MAX_LOCALS 		256
+#define POLY_MAX_LOCALS 	256
 // Initial heap for memory allocation in bytes
-#define POLY_INITIAL_MEM		1024
+#define POLY_INIT_MEM		1024
 // Expression used on new memory allocation, result in bytes
-#define POLY_ALLOCATE_MEM(x)	x * 2
+#define POLY_ALLOC_MEM(x)	x * 2
 
-typedef struct
+typedef struct poly_Scope
 {
-	Variable* locals[POLY_MAX_LOCALS];
-} Scope;
+	poly_Variable *local[POLY_MAX_LOCALS];
+} poly_Scope;
 
-typedef struct
+typedef struct poly_Stack
 {
 	size_t size;
-	const Value* value[POLY_MAX_STACK];
-	const Value* current;
-} Stack;
+	const poly_Value *val[POLY_MAX_STACK];
+	const poly_Value *cur;
+} poly_Stack;
 
-typedef struct
+typedef struct poly_CodeStream
 {
-	Code* stream;
-	const Code* current;
-	size_t allocatedmemory;
-	size_t maxmemory;
+	poly_Code *stream;
+	const poly_Code *cur;
+	size_t allotedmem;
+	size_t maxmem;
 	size_t size;
-} CodeStream;
+} poly_CodeStream;
 
-typedef struct
+typedef struct poly_VM
 {
-	Config* config;
-	Parser parser;
-	Stack stack;
-	CodeStream codestream;
+	poly_Config *config;
+	poly_Parser parser;
+	poly_Stack stack;
+	poly_CodeStream codestream;
 
-	Scope* scope[POLY_MAX_SCOPES];
+	poly_Scope *scope[POLY_MAX_SCOPES];
 	unsigned int curscope;
-} VM;
+} poly_VM;
 
-void lex(VM *vm);
-void parse(VM *vm);
-void interpret(VM *vm);
+void lex(poly_VM *vm);
+void parse(poly_VM *vm);
+void interpret(poly_VM *vm);
 
 #endif

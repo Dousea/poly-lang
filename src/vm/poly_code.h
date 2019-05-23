@@ -1,36 +1,36 @@
-#ifndef POLY_CODE_H
-#define POLY_CODE_H
+#ifndef POLY_CODE_H_
+#define POLY_CODE_H_
 
 #include "poly_value.h"
 
-typedef enum
+typedef enum poly_Instruction
 {
-    INST_LITERAL,
-    INST_GET_VALUE,
+    POLY_INST_LITERAL,
+    POLY_INST_GET_VALUE,
 
-    INST_BIN_ADD,
-    INST_BIN_SUB,
-    INST_BIN_MUL,
-    INST_BIN_DIV,
+    POLY_INST_BIN_ADD,
+    POLY_INST_BIN_SUB,
+    POLY_INST_BIN_MUL,
+    POLY_INST_BIN_DIV,
     
-    INST_UN_NEG,
+    POLY_INST_UN_NEG,
     
-    INST_ASSIGN,
+    POLY_INST_ASSIGN,
 
-    INST_END,
-} Instruction;
+    POLY_INST_END,
+} poly_Instruction;
 
-#define CODE_INST  0
-#define CODE_VALUE 1
+#define POLY_CODE_INST  0
+#define POLY_CODE_VALUE 1
 
-typedef struct
+typedef struct poly_Code
 {
     unsigned char type;
     union
     {
-        const Value* value;
-        Instruction inst;
+        const poly_Value *val;
+        poly_Instruction inst;
     };
-} Code;
+} poly_Code;
 
 #endif

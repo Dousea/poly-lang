@@ -3,11 +3,11 @@
 
 #include <stdlib.h>
 
-typedef void* (*Allocator)(void *ptr, size_t size);
+typedef void* (*poly_Allocator)(void *ptr, size_t size);
 
-typedef struct
+typedef struct poly_Config
 {
-	Allocator allocator;
-} Config;
+	poly_Allocator alloc;
+} poly_Config;
 
 #endif

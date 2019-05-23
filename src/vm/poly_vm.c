@@ -6,7 +6,7 @@
 #include "poly_value.h"
 #include "poly_log.h"
 
-static void throwerr(const char* fmt, ...)
+static void throwerr(const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -17,7 +17,7 @@ static void throwerr(const char* fmt, ...)
 	exit(EXIT_FAILURE);
 }
 
-static void pushvalue(VM* vm, const Value* value)
+static void pushvalue(poly_VM *vm, const poly_Value *val)
 {
 	assert(vm->stack.size < POLY_MAX_STACK);
 
@@ -25,163 +25,164 @@ static void pushvalue(VM* vm, const Value* value)
 	POLY_LOG_START(VMA)
 	POLY_LOG("Pushing ")
 
-	if (value->type == VALUE_NUMBER)
-		POLY_LOG("number: %e", value->num)
-	else if (value->type == VALUE_BOOLEAN)
-		POLY_LOG("boolean: %s", (value->bool ? "true" : "false"))
+	if (val->type == POLY_VAL_NUM)
+		POLY_LOG("number: %e", val->num)
+	else if (val->type == POLY_VAL_BOOL)
+		POLY_LOG("boolean: %s", (val->bool ? "true" : "false"))
 	else
-		POLY_LOG("identifier: '%s'", value->str)
+		POLY_LOG("identifier: '%s'", val->str)
 	
 	POLY_LOG("...\n")
 	POLY_LOG_END
 #endif
 
-	vm->stack.value[vm->stack.size++] = value;
+	vm->stack.val[vm->stack.size++] = val;
 }
 
-static const Value* popvalue(VM* vm)
+static const poly_Value *popvalue(poly_VM *vm)
 {
 	assert(vm->stack.size > 0);
 	
-	const Value* value = vm->stack.value[--vm->stack.size];
+	const poly_Value *val = vm->stack.val[--vm->stack.size];
 
 #ifdef POLY_DEBUG
 	POLY_LOG_START(VMA)
 	POLY_LOG("Popping ")
 
-	if (value->type == VALUE_NUMBER)
-		POLY_LOG("number: %e", value->num)
-	else if (value->type == VALUE_BOOLEAN)
-		POLY_LOG("boolean: %s", (value->bool ? "true" : "false"))
+	if (val->type == POLY_VAL_NUM)
+		POLY_LOG("number: %e", val->num)
+	else if (val->type == POLY_VAL_BOOL)
+		POLY_LOG("boolean: %s", (val->bool ? "true" : "false"))
 	else
-		POLY_LOG("identifier: '%s'", value->str)
+		POLY_LOG("identifier: '%s'", val->str)
 	
 	POLY_LOG("...\n")
 	POLY_LOG_END
 #endif
 
-	vm->stack.value[vm->stack.size] = NULL;
-	return value;
+	vm->stack.val[vm->stack.size] = NULL;
+	return val;
 }
 
-long hash(const char* str)
+long hash(const char *str)
 {
     long hash = 5381;
     int c;
 
-    while (c = *str++)
-        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+    while ((c = *str++) != '\0')
+        hash = ((hash << 5) + hash) + c; // hash  *33 + c
 
     return hash;
 }
 
-long localindex(const char* str)
+long localindex(const char *str)
 {
 	// FIXME: What should I do when `index` is actually in collision?
 	return hash(str) % POLY_MAX_LOCALS;
 }
 
-static const Value* getvalue(VM* vm, const char* identifier)
+static const poly_Value *getvalue(poly_VM *vm, const char *id)
 {
-	long index = localindex(identifier);
+	long index = localindex(id);
 #ifdef POLY_DEBUG
-	POLY_IMM_LOG(VMA, "Reading local '%s' from index %ld...\n", identifier, index)
+	POLY_IMM_LOG(VMA, "Reading local '%s' from index %ld...\n", id, index)
 #endif
-	Scope* scope = vm->scope[vm->curscope];
-	Variable* local = scope->locals[index];
-	return local->value;
+	poly_Scope *scope = vm->scope[vm->curscope];
+	poly_Variable *local = scope->local[index];
+	return local->val;
 }
 
-static void addlocal(VM* vm, const char* identifier, const Value* value)
+static void addlocal(poly_VM *vm, const char *id, const poly_Value *val)
 {
-	Variable* local = vm->config->allocator(NULL, sizeof(Variable*));
-	local->identifier = identifier;
-	local->value = value;
+	poly_Variable *local = (poly_Variable*)vm->config->alloc(NULL, sizeof(poly_Variable));
+	local->id = id;
+	local->val = val;
 
-	long index = localindex(local->identifier);
-	Scope* scope = vm->scope[vm->curscope];
-	scope->locals[index] = local;
+	long index = localindex(local->id);
+	poly_Scope *scope = vm->scope[vm->curscope];
+	scope->local[index] = local;
 
 #ifdef POLY_DEBUG
-	POLY_IMM_LOG(VMA, "Added local '%s' to index %ld\n", local->identifier, index)
+	POLY_IMM_LOG(VMA, "Added local '%s' to index %ld\n", local->id, index)
 #endif
 }
 
-static const Code* curcode(VM* vm)
+static const poly_Code *curcode(poly_VM *vm)
 {
-	return vm->codestream.current;
+	return vm->codestream.cur;
 }
 
-static void advcode(VM* vm)
+static void advcode(poly_VM *vm)
 {
-	vm->codestream.current++;
+	vm->codestream.cur++;
 }
 
-POLY_LOCAL void interpret(VM* vm)
+POLY_LOCAL void interpret(poly_VM *vm)
 {
-	Scope* scope = vm->config->allocator(NULL, sizeof(Scope*));
+	poly_Scope *scope = vm->config->alloc(NULL, sizeof(poly_Scope*));
 	vm->scope[vm->curscope] = scope;
 
-	while (curcode(vm)->inst != INST_END)
+	while (curcode(vm)->inst != POLY_INST_END)
 	{
 #ifdef POLY_DEBUG
 		POLY_IMM_LOG(VMA, "Reading instruction 0x%02X...\n", curcode(vm)->inst)
 #endif
 		switch (curcode(vm)->inst)
 		{
-		case INST_LITERAL:
+		case POLY_INST_LITERAL:
 		{
 			advcode(vm);
-			pushvalue(vm, curcode(vm)->value);
+			pushvalue(vm, curcode(vm)->val);
 
 			break;
 		}
-		case INST_GET_VALUE:
+		case POLY_INST_GET_VALUE:
 		{
-			const Value* identifier = popvalue(vm);
+			const poly_Value *id = popvalue(vm);
 
-			if (identifier->type == VALUE_IDENTIFIER)
+			if (id->type == POLY_VAL_ID)
 			{
-				const Value* value = getvalue(vm, identifier->str);
-				pushvalue(vm, value);
+				const poly_Value *val = getvalue(vm, id->str);
+				pushvalue(vm, val);
 			}
 			else
 				throwerr("identifier expected");
 
 			break;
 		}
-		case INST_BIN_ADD:
+		case POLY_INST_BIN_ADD:
 		{
-			const Value* rightvalue = popvalue(vm);
-			const Value* leftvalue = popvalue(vm);
+			const poly_Value *rval = popvalue(vm);
+			const poly_Value *lval = popvalue(vm);
 
-			if (rightvalue->type == VALUE_IDENTIFIER)
-				rightvalue = getvalue(vm, rightvalue->str);
-			if (leftvalue->type == VALUE_IDENTIFIER)
-				leftvalue = getvalue(vm, leftvalue->str);
+			// If the values are identifiers, get the respective values
+			if (rval->type == POLY_VAL_ID)
+				rval = getvalue(vm, rval->str);
+			if (lval->type == POLY_VAL_ID)
+				lval = getvalue(vm, lval->str);
 
-			Value newvalue;
+			poly_Value val;
 			
-			if (leftvalue->type == VALUE_NUMBER &&
-			    rightvalue->type == VALUE_NUMBER)
+			if (lval->type == POLY_VAL_NUM &&
+			    rval->type == POLY_VAL_NUM)
 			{
-				newvalue.type = VALUE_NUMBER;
-				newvalue.num = leftvalue->num + rightvalue->num;
+				val.type = POLY_VAL_NUM;
+				val.num = lval->num + rval->num;
 			}
 			else
 				throwerr("addition of the operands is illegal");
 
-			pushvalue(vm, &newvalue);
+			pushvalue(vm, &val);
 
 			break;
 		}
-		case INST_ASSIGN:
+		case POLY_INST_ASSIGN:
 		{
-			const Value* value = popvalue(vm);
-			const Value* identifier = popvalue(vm);
+			const poly_Value *val = popvalue(vm);
+			const poly_Value *id = popvalue(vm);
 
-			if (identifier->type == VALUE_IDENTIFIER)
-				addlocal(vm, identifier->str, value);
+			if (id->type == POLY_VAL_ID)
+				addlocal(vm, id->str, val);
 			else
 				throwerr("identifier expected");
 			

@@ -1,28 +1,28 @@
 #ifndef POLY_VALUE_H_
 #define POLY_VALUE_H_
 
-typedef enum
+typedef enum poly_ValueType
 {
-	VALUE_NUMBER,
-	VALUE_BOOLEAN,
-	VALUE_IDENTIFIER
-} ValueType;
+	POLY_VAL_NUM,
+	POLY_VAL_BOOL,
+	POLY_VAL_ID
+} poly_ValueType;
 
-typedef struct
+typedef struct poly_Value
 {
-	ValueType type;
+	poly_ValueType type;
 	union
 	{
-		char* str;
+		char *str;
 		double num;
 		_Bool bool;
 	};
-} Value;
+} poly_Value;
 
-typedef struct
+typedef struct poly_Variable
 {
-	const char* identifier;
-	const Value* value;
-} Variable;
+	const char *id;
+	const poly_Value *val;
+} poly_Variable;
 
 #endif
