@@ -12,7 +12,7 @@ static void throwerr(Parser* parser, const char* fmt, ...)
 	va_start(args, fmt);
 	fprintf(stderr, "\x1B[1;Parsing error: line %zu: ", parser->curln);
 	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\x1B[0m");
+	fprintf(stderr, "\x1B[0m\n");
 	va_end(args);
 	exit(EXIT_FAILURE);
 }

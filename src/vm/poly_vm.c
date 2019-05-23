@@ -12,7 +12,7 @@ static void throwerr(const char* fmt, ...)
 	va_start(args, fmt);
 	fprintf(stderr, "\x1B[1;31mError: ");
 	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\x1B[0m");
+	fprintf(stderr, "\x1B[0m\n");
 	va_end(args);
 	exit(EXIT_FAILURE);
 }

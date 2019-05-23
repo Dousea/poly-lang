@@ -16,7 +16,7 @@ static void throwerr(Lexer* lexer, const char* fmt, ...)
 	va_start(args, fmt);
 	fprintf(stderr, "\x1B[1;31mLexing error: line %zu: ", lexer->curln);
 	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\x1B[0m");
+	fprintf(stderr, "\x1B[0m\n");
 	va_end(args);
 	exit(EXIT_FAILURE);
 }
