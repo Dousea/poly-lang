@@ -63,7 +63,6 @@ typedef enum poly_TokenType
 	POLY_TOKEN_NEWLINE,
 	POLY_TOKEN_INDENT,
 
-	POLY_TOKEN_UNKNOWN,
 	POLY_TOKEN_EOF
 } poly_TokenType;
 

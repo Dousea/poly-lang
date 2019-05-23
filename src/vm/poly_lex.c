@@ -358,8 +358,8 @@ POLY_LOCAL void lex(poly_VM *vm)
 
 				break;
 			}
-
-			mktoken(vm, POLY_TOKEN_UNKNOWN);
+			
+			throwerr(&vm->parser.lexer, "unknown symbol");
 		}
 
 		advchar(&vm->parser.lexer);

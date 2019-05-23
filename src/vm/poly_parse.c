@@ -325,10 +325,6 @@ POLY_LOCAL void parse(poly_VM *vm)
 		case POLY_TOKEN_INDENT:
 			advtoken(&vm->parser);
 			break;
-		case POLY_TOKEN_UNKNOWN:
-			advtoken(&vm->parser);
-			throwerr(&vm->parser, "unknown symbol");
-			break;
 		default:
 			statement(vm);
 			break;
