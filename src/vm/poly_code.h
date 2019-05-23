@@ -5,7 +5,8 @@
 
 typedef enum
 {
-    INST_VALUE,
+    INST_LITERAL,
+    INST_GET_VALUE,
 
     INST_BIN_ADD,
     INST_BIN_SUB,
@@ -24,8 +25,9 @@ typedef enum
 
 typedef struct
 {
-    unsigned char type : 1;
-    union {
+    unsigned char type;
+    union
+    {
         const Value* value;
         Instruction inst;
     };

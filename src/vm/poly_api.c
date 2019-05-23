@@ -7,20 +7,20 @@
 #include "poly_vm.h"
 #include "poly_log.h"
 
-static void *defaultAllocator(void *ptr, size_t size)
+static void* defaultAllocator(void* ptr, size_t size)
 {
 	if (size == 0)
 	{
 		free(ptr);
 
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(MEM, "Freed memory at 0x%lX\n", (unsigned long)ptr)
+		POLY_IMM_LOG(MEM, "0x%lX: freed memory\n", (unsigned long)ptr)
 #endif
 
 		return NULL;
 	}
 	
-	void *tmp = realloc(ptr, size);
+	void* tmp = realloc(ptr, size);
 
 	if (tmp == NULL)
 	{
@@ -35,11 +35,11 @@ static void *defaultAllocator(void *ptr, size_t size)
 	POLY_LOG_START(MEM)
 
 	if (ptr == NULL)
-		POLY_LOG("Allocated %zu bytes at 0x%lX\n", size, (unsigned long)tmp)
+		POLY_LOG("0x%lX: %zu bytes allocated\n", (unsigned long)tmp, size)
 	else if (ptr == tmp)
-		POLY_LOG("Allocated %zu bytes to 0x%lX\n", size, (unsigned long)tmp)
+		POLY_LOG("0x%lX: allocated %zu bytes\n", (unsigned long)tmp, size)
 	else
-		POLY_LOG("Reallocated %zu bytes from 0x%lX to 0x%lX\n", size, (unsigned long)ptr, (unsigned long)tmp)
+		POLY_LOG("0x%lX: from 0x%lX reallocated %zu bytes\n", (unsigned long)tmp, (unsigned long)ptr, size)
 
 	POLY_LOG_END
 #endif
@@ -47,7 +47,7 @@ static void *defaultAllocator(void *ptr, size_t size)
 	return tmp;
 }
 
-POLY_API void polyInitConfig(Config *config)
+POLY_API void polyInitConfig(Config* config)
 {
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(API, "Initializing config...\n")
@@ -56,7 +56,7 @@ POLY_API void polyInitConfig(Config *config)
 	config->allocator = defaultAllocator;
 }
 
-POLY_API VM *polyNewVM(Config *config)
+POLY_API VM* polyNewVM(Config* config)
 {
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(API, "Creating new VM...\n")
@@ -67,7 +67,7 @@ POLY_API VM *polyNewVM(Config *config)
 	if (config != NULL)
 		allocate = config->allocator;
 
-	VM *vm = (VM*)allocate(NULL, sizeof(VM));
+	VM* vm = (VM*)allocate(NULL, sizeof(VM));
 	vm->config = (Config*)allocate(NULL, sizeof(Config));
 
 	if (config == NULL)
@@ -80,18 +80,20 @@ POLY_API VM *polyNewVM(Config *config)
 
 	vm->parser.tokenstream.allocatedmemory = 0;
 	vm->parser.tokenstream.maxmemory = POLY_INITIAL_MEM;
-	vm->parser.tokenstream.stream =
-		vm->parser.tokenstream.current = vm->config->allocator(NULL, POLY_INITIAL_MEM);
-	vm->parser.tokenstream.total = 0;
+	vm->parser.tokenstream.stream = vm->config->allocator(NULL, POLY_INITIAL_MEM);
+	vm->parser.tokenstream.current = vm->parser.tokenstream.stream;
+	vm->parser.tokenstream.size = 0;
 
 	vm->codestream.allocatedmemory = 0;
 	vm->codestream.maxmemory = POLY_INITIAL_MEM;
-	vm->codestream.stream = vm->codestream.current = vm->config->allocator(NULL, POLY_INITIAL_MEM);
+	vm->codestream.stream = vm->config->allocator(NULL, POLY_INITIAL_MEM);
+	vm->codestream.current = vm->codestream.stream;
+	vm->codestream.size = 0;
 
 	return vm;
 }
 
-POLY_API void polyFreeVM(VM *vm)
+POLY_API void polyFreeVM(VM* vm)
 {
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(API, "Freeing VM...\n")
@@ -105,7 +107,7 @@ POLY_API void polyFreeVM(VM *vm)
 	defaultAllocator(vm, 0);
 }
 
-POLY_API void polyInterpret(VM *vm, const char *source)
+POLY_API void polyInterpret(VM* vm, const char* source)
 {
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(API, "Interpreting `source`...\n")

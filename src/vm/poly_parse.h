@@ -70,24 +70,25 @@ typedef enum
 typedef struct
 {
 	TokenType type;
-	const char *start;
-	int len;
+	const char* start;
+	unsigned char len;
 	Value value;
 } Token;
 
 typedef struct
 {
 	Token* stream;
-	Token* current;
-	unsigned int total;
-	unsigned int allocatedmemory;
-	unsigned int maxmemory;
+	const Token* current;
+	size_t size;
+	size_t allocatedmemory;
+	size_t maxmemory;
 } TokenStream;
 
 typedef struct
 {
 	Lexer lexer;
 	TokenStream tokenstream;
+	size_t curln;
 } Parser;
 
 #endif

@@ -5,9 +5,10 @@
 
 typedef struct
 {
-	const char *source;
-	const char *curchar;
-	const char *tokenstart;
+	const char* source;
+	const char* curchar;
+	const char* tokenstart;
+	size_t curln;
 } Lexer;
 
 #endif

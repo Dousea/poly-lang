@@ -51,29 +51,29 @@ typedef struct
 
 typedef struct
 {
-	Value* current;
-	unsigned int size;
-	Value* value[POLY_MAX_STACK];
+	size_t size;
+	const Value* value[POLY_MAX_STACK];
+	const Value* current;
 } Stack;
 
 typedef struct
 {
-	Code* current;
 	Code* stream;
-	unsigned int allocatedmemory;
-	unsigned int maxmemory;
-	unsigned int size;
+	const Code* current;
+	size_t allocatedmemory;
+	size_t maxmemory;
+	size_t size;
 } CodeStream;
 
 typedef struct
 {
-	Config *config;
+	Config* config;
 	Parser parser;
 	Stack stack;
 	CodeStream codestream;
 
-	Scope* curscope;
 	Scope* scope[POLY_MAX_SCOPES];
+	unsigned int curscope;
 } VM;
 
 void lex(VM *vm);

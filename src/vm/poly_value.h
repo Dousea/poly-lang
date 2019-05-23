@@ -1,5 +1,5 @@
-#ifndef SRC_VM_POLY_VALUE_H_
-#define SRC_VM_POLY_VALUE_H_
+#ifndef POLY_VALUE_H_
+#define POLY_VALUE_H_
 
 typedef enum
 {
@@ -21,9 +21,8 @@ typedef struct
 
 typedef struct
 {
-	char* identifier;
-	int len;
-	Value* value;
+	const char* identifier;
+	const Value* value;
 } Variable;
 
 #endif

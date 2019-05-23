@@ -1,9 +1,21 @@
 #include <stdio.h>
+#include <stdarg.h>
 #include <assert.h>
 
 #include "poly_vm.h"
 #include "poly_code.h"
 #include "poly_log.h"
+
+static void throwerr(Parser* parser, const char* fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	fprintf(stderr, "\x1B[1;Parsing error: line %zu: ", parser->curln);
+	vfprintf(stderr, fmt, args);
+	fprintf(stderr, "\x1B[0m");
+	va_end(args);
+	exit(EXIT_FAILURE);
+}
 
 // Gets current token that's being parsed
 static const Token* curtoken(Parser *parser)
@@ -15,7 +27,9 @@ static const Token* curtoken(Parser *parser)
 static void advtoken(Parser *parser)
 {
 #ifdef POLY_DEBUG
-	POLY_IMM_LOG(PRS, "Consuming token 0x%02X...\n", parser->tokenstream.current->type)
+	POLY_IMM_LOG(MEM, "0x%lX: consuming token 0x%02X...\n",
+		(unsigned long)parser->tokenstream.current,
+		parser->tokenstream.current->type)
 #endif
 
 	parser->tokenstream.current++;
@@ -46,12 +60,23 @@ static Code* allocatecode(VM *vm, Code code)
 		                                               vm->codestream.maxmemory);
 
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Resized code stream memory to %u bytes\n", vm->codestream.maxmemory)
+		POLY_IMM_LOG(MEM, "Resized code stream memory to %zu bytes\n", vm->codestream.maxmemory)
 #endif
 	}
 
 	vm->codestream.allocatedmemory += size;
 	vm->codestream.stream[++vm->codestream.size - 1] = code;
+	
+#ifdef POLY_DEBUG
+	if (code.type == CODE_INST)
+		POLY_IMM_LOG(MEM, "0x%lX: created code instruction 0x%02X\n",
+			(unsigned long)(vm->codestream.stream + (vm->codestream.size - 1)),
+			code.inst)
+	else
+		POLY_IMM_LOG(MEM, "0x%lX: created code value 0x%02X\n",
+			(unsigned long)(vm->codestream.stream + (vm->codestream.size - 1)),
+			code.value->type)
+#endif
 
 	return (vm->codestream.stream + (vm->codestream.size - 1));
 }
@@ -59,17 +84,13 @@ static Code* allocatecode(VM *vm, Code code)
 // Creates a new code then put it in codestream
 static void mkcode(VM *vm, Instruction inst, const Value* value)
 {
-#ifdef POLY_DEBUG
-	POLY_IMM_LOG(PRS, "Creating code instruction 0x%02X...\n", inst)
-#endif
-
 	Code code;
 	code.type = CODE_INST;
 	code.inst = inst;
 
 	allocatecode(vm, code);
 
-	if (inst == INST_VALUE)
+	if (inst == INST_LITERAL)
 	{
 		Code code;
 		code.type = CODE_VALUE;
@@ -90,10 +111,21 @@ static _Bool value(VM *vm)
 	case TOKEN_NUMBER:
 	case TOKEN_IDENTIFIER:
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got value\n")
+		POLY_LOG_START(PRS)
+		POLY_LOG("Got ")
+
+		if (curtoken(&vm->parser)->value.type == VALUE_NUMBER)
+			POLY_LOG("number: %e", curtoken(&vm->parser)->value.num)
+		else if (curtoken(&vm->parser)->value.type == VALUE_BOOLEAN)
+			POLY_LOG("boolean: %s", (curtoken(&vm->parser)->value.bool ? "true" : "false"))
+		else
+			POLY_LOG("identifier: '%s'", curtoken(&vm->parser)->value.str)
+		
+		POLY_LOG("\n")
+		POLY_LOG_END
 #endif
 		
-		mkcode(vm, INST_VALUE, &curtoken(&vm->parser)->value);
+		mkcode(vm, INST_LITERAL, &curtoken(&vm->parser)->value);
 		advtoken(&vm->parser);
 		return 1;
 	default:
@@ -103,7 +135,7 @@ static _Bool value(VM *vm)
 	return 0;
 }
 
-static _Bool binaryoperator(VM *vm)
+static TokenType binaryoperator(VM *vm)
 {
 	TokenType type = curtoken(&vm->parser)->type;
 
@@ -116,24 +148,13 @@ static _Bool binaryoperator(VM *vm)
 #ifdef POLY_DEBUG
 		POLY_IMM_LOG(PRS, "Got binary operator\n")
 #endif
-		
-		if (type == TOKEN_PLUS)
-			mkcode(vm, INST_BIN_ADD, NULL);
-		else if (type == TOKEN_MINUS)
-			mkcode(vm, INST_BIN_SUB, NULL);
-		else if (type == TOKEN_ASTERISK)
-			mkcode(vm, INST_BIN_MUL, NULL);
-		else
-			mkcode(vm, INST_BIN_DIV, NULL);
-
 		advtoken(&vm->parser);
-
-		return 1;
+		return type;
 	default:
 		break;
 	}
-
-	return 0;
+	
+	return TOKEN_EOF;
 }
 
 static _Bool unaryoperator(VM *vm)
@@ -163,13 +184,25 @@ static _Bool expression(VM *vm)
 #endif
 
 	if (value(vm) || expression(vm))
-		if (binaryoperator(vm))
+	{
+		TokenType type = binaryoperator(vm);
+
+		if (type != TOKEN_EOF)
 		{
 			if (expression(vm))
 			{
 #ifdef POLY_DEBUG
 				POLY_IMM_LOG(PRS, "Got binary expression\n")
 #endif
+				
+				if (type == TOKEN_PLUS)
+					mkcode(vm, INST_BIN_ADD, NULL);
+				else if (type == TOKEN_MINUS)
+					mkcode(vm, INST_BIN_SUB, NULL);
+				else if (type == TOKEN_ASTERISK)
+					mkcode(vm, INST_BIN_MUL, NULL);
+				else
+					mkcode(vm, INST_BIN_DIV, NULL);
 
 				return 1;
 			}
@@ -178,7 +211,7 @@ static _Bool expression(VM *vm)
 			// Here we got a value or an expression, but no binary operator...
 			// it's still a valid expression.
 			return 1;
-		
+	}
 
 	if (unaryoperator(vm))
 		if (value(vm) || expression(vm))
@@ -218,10 +251,11 @@ static _Bool variable(VM *vm)
 	if (curtoken(&vm->parser)->type == TOKEN_IDENTIFIER)
 	{
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got variable\n")
+		POLY_IMM_LOG(PRS, "Got '%s' variable\n", curtoken(&vm->parser)->value.str)
 #endif
-
+		mkcode(vm, INST_LITERAL, &curtoken(&vm->parser)->value);
 		advtoken(&vm->parser);
+
 		return 1;
 	}
 	
@@ -278,7 +312,7 @@ POLY_LOCAL void parse(VM *vm)
 #endif
 
 	// Current line position of token that's being consumed
-	int curln = 1;
+	vm->parser.curln = 1;
 
 	while (curtoken(&vm->parser)->type != TOKEN_EOF)
 	{
@@ -286,15 +320,15 @@ POLY_LOCAL void parse(VM *vm)
 		{
 		case TOKEN_NEWLINE:
 			advtoken(&vm->parser);
-			curln++;
+			vm->parser.curln++;
 			break;
 		case TOKEN_INDENT:
 			advtoken(&vm->parser);
 			break;
 		case TOKEN_UNKNOWN:
 			advtoken(&vm->parser);
-			// TODO: Gives a parser error
-			fprintf(stderr, "An unknown symbol is found\n"); break;
+			throwerr(&vm->parser, "unknown symbol");
+			break;
 		default:
 			statement(vm);
 			break;
@@ -302,4 +336,10 @@ POLY_LOCAL void parse(VM *vm)
 	}
 	
 	mkcode(vm, INST_END, NULL);
+
+#ifdef POLY_DEBUG
+	POLY_IMM_LOG(PRS, "Allocated %zu bytes for %zu codes\n",
+		vm->codestream.allocatedmemory,
+		vm->codestream.size)
+#endif
 }
