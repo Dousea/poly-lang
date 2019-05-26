@@ -22,7 +22,7 @@ typedef struct poly_Value
 typedef struct poly_Variable
 {
 	const char *id;
-	const poly_Value *val;
+	poly_Value *val;
 } poly_Variable;
 
 #endif

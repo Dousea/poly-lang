@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "poly_vm.h"
+#include "poly_parse.h"
 #include "poly_code.h"
 #include "poly_log.h"
 
@@ -10,7 +11,7 @@ static void throwerr(poly_Parser *parser, const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
-	fprintf(stderr, "\x1B[1;Parsing error: line %zu: ", parser->curln);
+	fprintf(stderr, "\x1B[1;31mParsing error: line %zu: ", parser->curln);
 	vfprintf(stderr, fmt, args);
 	fprintf(stderr, "\x1B[0m\n");
 	va_end(args);
@@ -18,30 +19,30 @@ static void throwerr(poly_Parser *parser, const char *fmt, ...)
 }
 
 // Gets current token that's being parsed
-static const poly_Token *curtoken(poly_Parser *parser)
+static const poly_Token *curtoken(poly_Lexer *lexer)
 {
-	return parser->tokenstream.cur;
+	return lexer->tokenstream.cur;
 }
 
 // Advances to the next token
-static void advtoken(poly_Parser *parser)
+static void advtoken(poly_Lexer *lexer)
 {
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(MEM, "0x%lX: consuming token 0x%02X...\n",
-		(unsigned long)parser->tokenstream.cur,
-		parser->tokenstream.cur->type)
+		(unsigned long)lexer->tokenstream.cur,
+		lexer->tokenstream.cur->type)
 #endif
 
-	parser->tokenstream.cur++;
+	lexer->tokenstream.cur++;
 }
 
 // If current token type is [t] advance to the token then return 1, otherwise
 // return 0
-static _Bool curtokenadv(poly_Parser *parser, poly_TokenType type)
+static _Bool curtokenadv(poly_Lexer *lexer, poly_TokenType type)
 {
-	if (curtoken(parser)->type == type)
+	if (curtoken(lexer)->type == type)
 	{
-		advtoken(parser);
+		advtoken(lexer);
 		return 1;
 	}
 	else
@@ -82,7 +83,7 @@ static poly_Code *alloccode(poly_VM *vm, poly_Code code)
 }
 
 // Creates a new code then put it in codestream
-static void mkcode(poly_VM *vm, poly_Instruction inst, const poly_Value *val)
+static void mkcode(poly_VM *vm, poly_Instruction inst, poly_Value *val)
 {
 	poly_Code code;
 	code.type = POLY_CODE_INST;
@@ -100,34 +101,103 @@ static void mkcode(poly_VM *vm, poly_Instruction inst, const poly_Value *val)
 	}
 }
 
-/**** *GRAMMAR RULES *****/
+/////////////////////////////////
+/*** SHUNTING YARD ALGORITHM ***/
+/////////////////////////////////
+
+static poly_Operator operators[] = {
+	{ POLY_TOKEN_CARET,         9, POLY_OP_ASSOC_RIGHT },
+	{ POLY_TOKEN_ASTERISK,      8, POLY_OP_ASSOC_LEFT  },
+	{ POLY_TOKEN_SLASH,         8, POLY_OP_ASSOC_LEFT  },
+	{ POLY_TOKEN_PRCNTSGN,      8, POLY_OP_ASSOC_LEFT  },
+	{ POLY_TOKEN_PLUS,          5, POLY_OP_ASSOC_LEFT  },
+	{ POLY_TOKEN_MINUS,         5, POLY_OP_ASSOC_LEFT  },
+	{ POLY_TOKEN_OPENRNDBRCKT,  0, POLY_OP_ASSOC_NONE  },
+	{ POLY_TOKEN_CLOSERNDBRCKT, 0, POLY_OP_ASSOC_NONE  }
+};
+
+static const poly_Operator *gettopopstack(poly_Parser *parser)
+{
+	return parser->opstack[parser->opstacksize-1];
+}
+
+static void pushopstack(poly_Parser *parser, const poly_Operator *op)
+{
+	if (parser->opstacksize > POLY_MAX_OP_STACK)
+		throwerr(parser, "operator stack overflow");
+	
+#ifdef POLY_DEBUG
+	POLY_IMM_LOG(PRS, "Pushing operator 0x%02X...\n", op->type)
+#endif
+	
+	parser->opstack[parser->opstacksize++] = op;
+}
+
+static const poly_Operator *popopstack(poly_Parser *parser)
+{
+	if (parser->opstacksize == 0)
+		throwerr(parser, "operator stack empty");
+
+#ifdef POLY_DEBUG
+	POLY_IMM_LOG(PRS, "Popping operator 0x%02X...\n", parser->opstack[parser->opstacksize-1]->type)
+#endif
+
+	return parser->opstack[--parser->opstacksize];
+}
+
+static void pushopcode(poly_VM *vm, poly_TokenType type)
+{
+	switch (type)
+	{
+	case POLY_TOKEN_PLUS:
+		mkcode(vm, POLY_INST_BIN_ADD, curtoken(&vm->lexer)->val); break;
+	case POLY_TOKEN_MINUS:
+		mkcode(vm, POLY_INST_BIN_SUB, curtoken(&vm->lexer)->val); break;
+	case POLY_TOKEN_ASTERISK:
+		mkcode(vm, POLY_INST_BIN_MUL, curtoken(&vm->lexer)->val); break;
+	case POLY_TOKEN_SLASH:
+		mkcode(vm, POLY_INST_BIN_DIV, curtoken(&vm->lexer)->val); break;
+	case POLY_TOKEN_PRCNTSGN:
+		mkcode(vm, POLY_INST_BIN_MOD, curtoken(&vm->lexer)->val); break;
+	case POLY_TOKEN_CARET:
+		mkcode(vm, POLY_INST_BIN_POW, curtoken(&vm->lexer)->val); break;
+	default:
+		break;
+	}
+}
+
+///////////////////////
+/*** GRAMMAR RULES ***/
+///////////////////////
 
 static _Bool value(poly_VM *vm)
 {
-	switch (curtoken(&vm->parser)->type)
+	switch (curtoken(&vm->lexer)->type)
 	{
 	case POLY_TOKEN_FALSE:
 	case POLY_TOKEN_TRUE:
 	case POLY_TOKEN_NUMBER:
 	case POLY_TOKEN_IDENTIFIER:
+	{
 #ifdef POLY_DEBUG
 		POLY_LOG_START(PRS)
 		POLY_LOG("Got ")
 
-		if (curtoken(&vm->parser)->val.type == POLY_VAL_NUM)
-			POLY_LOG("number: %e", curtoken(&vm->parser)->val.num)
-		else if (curtoken(&vm->parser)->val.type == POLY_VAL_BOOL)
-			POLY_LOG("boolean: %s", (curtoken(&vm->parser)->val.bool ? "true" : "false"))
+		if (curtoken(&vm->lexer)->val->type == POLY_VAL_NUM)
+			POLY_LOG("number: %.02f", curtoken(&vm->lexer)->val->num)
+		else if (curtoken(&vm->lexer)->val->type == POLY_VAL_BOOL)
+			POLY_LOG("boolean: %s", (curtoken(&vm->lexer)->val->bool ? "true" : "false"))
 		else
-			POLY_LOG("identifier: '%s'", curtoken(&vm->parser)->val.str)
-		
+			POLY_LOG("identifier: '%s'", curtoken(&vm->lexer)->val->str)
+			
 		POLY_LOG("\n")
 		POLY_LOG_END
 #endif
 		
-		mkcode(vm, POLY_INST_LITERAL, &curtoken(&vm->parser)->val);
-		advtoken(&vm->parser);
+		mkcode(vm, POLY_INST_LITERAL, curtoken(&vm->lexer)->val);
+		advtoken(&vm->lexer);
 		return 1;
+	}
 	default:
 		break;
 	}
@@ -135,46 +205,23 @@ static _Bool value(poly_VM *vm)
 	return 0;
 }
 
-static poly_TokenType binaryoperator(poly_VM *vm)
+static const poly_Operator *operator(poly_VM *vm)
 {
-	poly_TokenType type = curtoken(&vm->parser)->type;
+	poly_TokenType type = curtoken(&vm->lexer)->type;
 
-	switch (type)
+	for (unsigned int i = 0; i < sizeof operators / sizeof operators[0]; i++)
 	{
-	case POLY_TOKEN_PLUS:
-	case POLY_TOKEN_MINUS:
-	case POLY_TOKEN_ASTERISK:
-	case POLY_TOKEN_SLASH:
+		if (operators[i].type == type)
+		{
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got binary operator\n")
+			POLY_IMM_LOG(PRS, "Got operator 0x%02X\n", type)
 #endif
-		advtoken(&vm->parser);
-		return type;
-	default:
-		break;
+			advtoken(&vm->lexer);
+			return operators + i;
+		}
 	}
 	
-	return POLY_TOKEN_EOF;
-}
-
-static _Bool unaryoperator(poly_VM *vm)
-{
-	switch (curtoken(&vm->parser)->type)
-	{
-	case POLY_TOKEN_MINUS:
-#ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got unary operator\n")
-#endif
-
-		mkcode(vm, POLY_INST_UN_NEG, NULL);
-		advtoken(&vm->parser);
-
-		return 1;
-	default:
-		break;
-	}
-
-	return 0;
+	return NULL;
 }
 
 static _Bool expression(poly_VM *vm)
@@ -183,47 +230,59 @@ static _Bool expression(poly_VM *vm)
 	POLY_IMM_LOG(PRS, "Reading expression...\n")
 #endif
 
-	if (value(vm) || expression(vm))
+	const poly_Operator *op = NULL;
+	const poly_Operator *pop;
+
+	while (1)
 	{
-		poly_TokenType type = binaryoperator(vm);
-
-		if (type != POLY_TOKEN_EOF)
+		if (value(vm))
+			// ... so we got a value; continue.
+			continue;
+		else if ((op = operator(vm)) == NULL)
+			// ... but we didn't get anything; break.
+			break;
+		
+		if (op->type == POLY_TOKEN_OPENRNDBRCKT)
 		{
-			if (expression(vm))
-			{
-#ifdef POLY_DEBUG
-				POLY_IMM_LOG(PRS, "Got binary expression\n")
-#endif
-				
-				if (type == POLY_TOKEN_PLUS)
-					mkcode(vm, POLY_INST_BIN_ADD, NULL);
-				else if (type == POLY_TOKEN_MINUS)
-					mkcode(vm, POLY_INST_BIN_SUB, NULL);
-				else if (type == POLY_TOKEN_ASTERISK)
-					mkcode(vm, POLY_INST_BIN_MUL, NULL);
-				else
-					mkcode(vm, POLY_INST_BIN_DIV, NULL);
-
-				return 1;
-			}
+			pushopstack(&vm->parser, op);
+			continue;
 		}
-		else
-			// Here we got a val or an expression, but no binary operator...
-			// it's still a valid expression.
-			return 1;
+		else if (op->type == POLY_TOKEN_CLOSERNDBRCKT)
+		{
+			
+			while (gettopopstack(&vm->parser)->type != POLY_TOKEN_OPENRNDBRCKT)
+			{
+				pop = popopstack(&vm->parser);
+				pushopcode(vm, pop->type);
+			}
+
+			if ((pop = popopstack(&vm->parser)) == NULL ||
+			    pop->type != POLY_TOKEN_OPENRNDBRCKT)
+				throwerr(&vm->parser, "no matching \'(\'");
+
+			continue;
+		}
+		
+		while (vm->parser.opstacksize > 0 &&
+		       ((op->assoc == POLY_OP_ASSOC_RIGHT && gettopopstack(&vm->parser)->prec > op->prec) ||
+			    (op->assoc == POLY_OP_ASSOC_LEFT && gettopopstack(&vm->parser)->prec >= op->prec)))
+		{
+			pop = popopstack(&vm->parser);
+			pushopcode(vm, pop->type);
+		}
+		
+		pushopstack(&vm->parser, op);
 	}
 
-	if (unaryoperator(vm))
-		if (value(vm) || expression(vm))
-		{
-#ifdef POLY_DEBUG
-			POLY_IMM_LOG(PRS, "Got unary expression\n")
-#endif
-
-			return 1;
-		}
-
-	return 0;
+	while (vm->parser.opstacksize > 0 && (op = popopstack(&vm->parser)) != NULL)
+	{
+		if (op->type == POLY_TOKEN_OPENRNDBRCKT)
+			throwerr(&vm->parser, "no matching \')\'");
+		
+		pushopcode(vm, op->type);
+	}
+	
+	return 1;
 }
 
 static _Bool expressionlist(poly_VM *vm)
@@ -234,7 +293,7 @@ static _Bool expressionlist(poly_VM *vm)
 
 	if (expression(vm))
 	{
-		while (curtokenadv(&vm->parser, POLY_TOKEN_COMMA))
+		while (curtokenadv(&vm->lexer, POLY_TOKEN_COMMA))
 			if (expression(vm))
 				continue;
 			else
@@ -248,13 +307,13 @@ static _Bool expressionlist(poly_VM *vm)
 
 static _Bool variable(poly_VM *vm)
 {
-	if (curtoken(&vm->parser)->type == POLY_TOKEN_IDENTIFIER)
+	if (curtoken(&vm->lexer)->type == POLY_TOKEN_IDENTIFIER)
 	{
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(PRS, "Got '%s' variable\n", curtoken(&vm->parser)->val.str)
+		POLY_IMM_LOG(PRS, "Got '%s' variable\n", curtoken(&vm->lexer)->val->str)
 #endif
-		mkcode(vm, POLY_INST_LITERAL, &curtoken(&vm->parser)->val);
-		advtoken(&vm->parser);
+		mkcode(vm, POLY_INST_LITERAL, curtoken(&vm->lexer)->val);
+		advtoken(&vm->lexer);
 
 		return 1;
 	}
@@ -270,7 +329,7 @@ static _Bool variablelist(poly_VM *vm)
 
 	if (variable(vm))
 	{
-		while (curtokenadv(&vm->parser, POLY_TOKEN_COMMA))
+		while (curtokenadv(&vm->lexer, POLY_TOKEN_COMMA))
 			if (variable(vm))
 				continue;
 			else
@@ -289,7 +348,7 @@ static _Bool statement(poly_VM *vm)
 #endif
 
 	if (variablelist(vm) &&
-	    curtokenadv(&vm->parser, POLY_TOKEN_EQ) &&
+	    curtokenadv(&vm->lexer, POLY_TOKEN_EQ) &&
 		expressionlist(vm))
 	{
 #ifdef POLY_DEBUG
@@ -314,16 +373,16 @@ POLY_LOCAL void parse(poly_VM *vm)
 	// Current line position of token that's being consumed
 	vm->parser.curln = 1;
 
-	while (curtoken(&vm->parser)->type != POLY_TOKEN_EOF)
+	while (curtoken(&vm->lexer)->type != POLY_TOKEN_EOF)
 	{
-		switch (curtoken(&vm->parser)->type)
+		switch (curtoken(&vm->lexer)->type)
 		{
 		case POLY_TOKEN_NEWLINE:
-			advtoken(&vm->parser);
+			advtoken(&vm->lexer);
 			vm->parser.curln++;
 			break;
 		case POLY_TOKEN_INDENT:
-			advtoken(&vm->parser);
+			advtoken(&vm->lexer);
 			break;
 		default:
 			statement(vm);

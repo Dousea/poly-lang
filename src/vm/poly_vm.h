@@ -2,6 +2,7 @@
 #define POLY_VM_H
 
 #include "poly_config.h"
+#include "poly_lex.h"
 #include "poly_parse.h"
 #include "poly_code.h"
 
@@ -52,7 +53,7 @@ typedef struct poly_Scope
 typedef struct poly_Stack
 {
 	size_t size;
-	const poly_Value *val[POLY_MAX_STACK];
+	poly_Value *val[POLY_MAX_STACK];
 	const poly_Value *cur;
 } poly_Stack;
 
@@ -68,6 +69,7 @@ typedef struct poly_CodeStream
 typedef struct poly_VM
 {
 	poly_Config *config;
+	poly_Lexer lexer;
 	poly_Parser parser;
 	poly_Stack stack;
 	poly_CodeStream codestream;

@@ -12,6 +12,8 @@ typedef enum poly_Instruction
     POLY_INST_BIN_SUB,
     POLY_INST_BIN_MUL,
     POLY_INST_BIN_DIV,
+    POLY_INST_BIN_MOD,
+    POLY_INST_BIN_POW,
     
     POLY_INST_UN_NEG,
     
@@ -28,7 +30,7 @@ typedef struct poly_Code
     unsigned char type;
     union
     {
-        const poly_Value *val;
+        poly_Value *val;
         poly_Instruction inst;
     };
 } poly_Code;

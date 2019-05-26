@@ -95,13 +95,13 @@ static poly_Token *mktoken(poly_VM *vm, poly_TokenType type)
 	// Makes a new token
 	poly_Token token;
 	token.type = type;
-	token.start = vm->parser.lexer.tokenstart;
+	token.start = vm->lexer.tokenstart;
 	
-	size_t len = lenchar(&vm->parser.lexer);
+	size_t len = lenchar(&vm->lexer);
 
 #define MAX_CHARS CHAR_BIT * sizeof(token.len)
 	if (len > MAX_CHARS)
-		throwerr(&vm->parser.lexer, "length of characters is too big! (more than %zu)", MAX_CHARS);
+		throwerr(&vm->lexer, "length of characters is too big! (more than %zu)", MAX_CHARS);
 #undef MAX_CHARS
 	
 	token.len = len;
@@ -109,33 +109,33 @@ static poly_Token *mktoken(poly_VM *vm, poly_TokenType type)
 	// Keep track on our memory allocation here
 	size_t size = sizeof(poly_Token);
 
-	if ((vm->parser.tokenstream.allotedmem + size) > vm->parser.tokenstream.maxmem)
+	if ((vm->lexer.tokenstream.allotedmem + size) > vm->lexer.tokenstream.maxmem)
 	{
-		vm->parser.tokenstream.maxmem = POLY_ALLOC_MEM(vm->parser.tokenstream.maxmem);
-		vm->parser.tokenstream.stream = vm->config->alloc(vm->parser.tokenstream.stream,
-		                                                  vm->parser.tokenstream.maxmem);
+		vm->lexer.tokenstream.maxmem = POLY_ALLOC_MEM(vm->lexer.tokenstream.maxmem);
+		vm->lexer.tokenstream.stream = vm->config->alloc(vm->lexer.tokenstream.stream,
+		                                                  vm->lexer.tokenstream.maxmem);
 
 #ifdef POLY_DEBUG
-		POLY_IMM_LOG(MEM, "Resized token stream memory to %zu bytes\n", vm->parser.tokenstream.maxmem)
+		POLY_IMM_LOG(MEM, "Resized token stream memory to %zu bytes\n", vm->lexer.tokenstream.maxmem)
 #endif
 	}
 
-	vm->parser.tokenstream.allotedmem += size;
-	vm->parser.tokenstream.stream[++vm->parser.tokenstream.size - 1] = token;
+	vm->lexer.tokenstream.allotedmem += size;
+	vm->lexer.tokenstream.stream[++vm->lexer.tokenstream.size - 1] = token;
 
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(MEM, "0x%lX: created token 0x%02X\n",
-		(unsigned long)(vm->parser.tokenstream.stream + (vm->parser.tokenstream.size - 1)),
+		(unsigned long)(vm->lexer.tokenstream.stream + (vm->lexer.tokenstream.size - 1)),
 		type)
 #endif
 
-	return (vm->parser.tokenstream.stream + (vm->parser.tokenstream.size - 1));
+	return (vm->lexer.tokenstream.stream + (vm->lexer.tokenstream.size - 1));
 }
 
 // Creates [second] token if next character is [c], otherwise [first] token
 static poly_Token *mkterntoken(poly_VM *vm, char c, poly_TokenType first, poly_TokenType second)
 {
-	return (nextcharadv(&vm->parser.lexer, c) ? mktoken(vm, second) : mktoken(vm, first));
+	return (nextcharadv(&vm->lexer, c) ? mktoken(vm, second) : mktoken(vm, first));
 }
 
 // Creates a lexical token stream to be parsed
@@ -155,11 +155,11 @@ POLY_LOCAL void lex(poly_VM *vm)
 	// Current character that's being lexed
 	char c;
 
-	vm->parser.lexer.curln = 0;
+	vm->lexer.curln = 0;
 
-	while ((c = curchar(&vm->parser.lexer)) != '\0')
+	while ((c = curchar(&vm->lexer)) != '\0')
 	{
-		vm->parser.lexer.tokenstart = vm->parser.lexer.curchar;
+		vm->lexer.tokenstart = vm->lexer.curchar;
 
 		switch (c)
 		{
@@ -194,7 +194,7 @@ POLY_LOCAL void lex(poly_VM *vm)
 		case ':':
 			mkterntoken(vm, c, POLY_TOKEN_CLN, POLY_TOKEN_CLNCLN); break;
 		case '.': // TODO: Maybe reads number with no leading zero (e.g. .75)? (low priority)
-			if (nextcharadv(&vm->parser.lexer, c))
+			if (nextcharadv(&vm->lexer, c))
 				mkterntoken(vm, c, POLY_TOKEN_DOTDOT, POLY_TOKEN_DOTDOTDOT);
 			else
 				mktoken(vm, POLY_TOKEN_DOT);
@@ -215,21 +215,21 @@ POLY_LOCAL void lex(poly_VM *vm)
 		case '\\': // TODO: Support for escape sequences (e.g. unicode) (low priority)
 			mktoken(vm, POLY_TOKEN_BACKSLASH); break;
 		case '\n':
-			vm->parser.lexer.curln++;
+			vm->lexer.curln++;
 			mktoken(vm, POLY_TOKEN_NEWLINE);
 			break;
 		case ' ': case '\t':
-			if (prevchar(&vm->parser.lexer) == '\n')
+			if (prevchar(&vm->lexer) == '\n')
 			{
 				if (firstindent == 0)
 				{
 					firstindent = 1;
 					indent.c = c;
 
-					while (nextchar(&vm->parser.lexer) == c)
-						advchar(&vm->parser.lexer);
+					while (nextchar(&vm->lexer) == c)
+						advchar(&vm->lexer);
 
-					indent.len = lenchar(&vm->parser.lexer);
+					indent.len = lenchar(&vm->lexer);
 
 					poly_Token *t = mktoken(vm, POLY_TOKEN_INDENT);
 					t->len = 1;
@@ -238,10 +238,10 @@ POLY_LOCAL void lex(poly_VM *vm)
 				{
 					if (c == indent.c)
 					{
-						while (nextchar(&vm->parser.lexer) == c)
-							advchar(&vm->parser.lexer);
+						while (nextchar(&vm->lexer) == c)
+							advchar(&vm->lexer);
 
-						int len = lenchar(&vm->parser.lexer);
+						int len = lenchar(&vm->lexer);
 
 						if (len % indent.len == 0)
 						{
@@ -249,120 +249,125 @@ POLY_LOCAL void lex(poly_VM *vm)
 							t->len = len / indent.len;
 						}
 						else
-							throwerr(&vm->parser.lexer, "inconsistent type of identation");
+							throwerr(&vm->lexer, "inconsistent type of identation");
 					}
 					else
-						throwerr(&vm->parser.lexer, "inconsistent type of indentation");
+						throwerr(&vm->lexer, "inconsistent type of indentation");
 				}
 			}
 
 			break;
 		case '#':
 			// Multi-line comment -> #:<comment>:#
-			if (nextcharadv(&vm->parser.lexer, ':'))
+			if (nextcharadv(&vm->lexer, ':'))
 			{
 				int nested = 0;
 
-				while (nextchar(&vm->parser.lexer) != '\0')
+				while (nextchar(&vm->lexer) != '\0')
 				{
-					if (nextcharadv(&vm->parser.lexer, '#'))
+					if (nextcharadv(&vm->lexer, '#'))
 					{
-						if (nextcharadv(&vm->parser.lexer, ':'))
+						if (nextcharadv(&vm->lexer, ':'))
 							nested++;
 					}
-					else if (nextcharadv(&vm->parser.lexer, ':'))
+					else if (nextcharadv(&vm->lexer, ':'))
 					{
-						if (nextcharadv(&vm->parser.lexer, '#'))
+						if (nextcharadv(&vm->lexer, '#'))
 							nested--;
 					}
 
 					if (nested < 0)
 						break;
 
-					advchar(&vm->parser.lexer);
+					advchar(&vm->lexer);
 				}
 
 				// If we go here then this must be an unterminated comment
-				throwerr(&vm->parser.lexer, "unterminated comment");
+				throwerr(&vm->lexer, "unterminated comment");
 			}
 			// Single-line comment -> #<comment>
 			else
-				while (nextchar(&vm->parser.lexer) != '\n' && nextchar(&vm->parser.lexer) != '\0')
-					advchar(&vm->parser.lexer);
+				while (nextchar(&vm->lexer) != '\n' && nextchar(&vm->lexer) != '\0')
+					advchar(&vm->lexer);
 
 			break;
 		default:
 			if (isdigit(c)) // Reads number!
 				// TODO: Reads hex? (low priority)
 			{
-				while (isdigit(nextchar(&vm->parser.lexer)))
-					advchar(&vm->parser.lexer);
+				while (isdigit(nextchar(&vm->lexer)))
+					advchar(&vm->lexer);
 
-				if (nextcharadv(&vm->parser.lexer, '.'))
-					if (isdigit(nextchar(&vm->parser.lexer)))
-						while (isdigit(nextchar(&vm->parser.lexer)))
-							advchar(&vm->parser.lexer);
+				if (nextcharadv(&vm->lexer, '.'))
+					if (isdigit(nextchar(&vm->lexer)))
+						while (isdigit(nextchar(&vm->lexer)))
+							advchar(&vm->lexer);
 
-				if (nextcharadv(&vm->parser.lexer, 'e') || nextcharadv(&vm->parser.lexer, 'E'))
+				if (nextcharadv(&vm->lexer, 'e') || nextcharadv(&vm->lexer, 'E'))
 				{
-					nextcharadv(&vm->parser.lexer, '-');
+					nextcharadv(&vm->lexer, '-');
 
-					if (!isdigit(nextchar(&vm->parser.lexer)))
-						throwerr(&vm->parser.lexer, "unterminated scientific notation");
+					if (!isdigit(nextchar(&vm->lexer)))
+						throwerr(&vm->lexer, "unterminated scientific notation");
 
-					while (isdigit(nextchar(&vm->parser.lexer)))
-						advchar(&vm->parser.lexer);
+					while (isdigit(nextchar(&vm->lexer)))
+						advchar(&vm->lexer);
 				}
 
 				errno = 0;
-				double num = strtod(vm->parser.lexer.tokenstart, NULL);
+				double num = strtod(vm->lexer.tokenstart, NULL);
 
 				if (errno == ERANGE)
-					throwerr(&vm->parser.lexer, "number literal is too large");
+					throwerr(&vm->lexer, "number literal is too large");
 
 				poly_Token *t = mktoken(vm, POLY_TOKEN_NUMBER);
-				t->val.type = POLY_VAL_NUM;
-				t->val.num = num;
+				poly_Value *val = (poly_Value*)vm->config->alloc(NULL, sizeof(poly_Value));
+				val->type = POLY_VAL_NUM;
+				val->num = num;
+				t->val = val;
 
 				break;
 			}
 			else if (isalpha(c) || c == '_') // Reads name!
 			{
-				while (isalnum(nextchar(&vm->parser.lexer)) || nextchar(&vm->parser.lexer) == '_')
-					advchar(&vm->parser.lexer);
+				while (isalnum(nextchar(&vm->lexer)) || nextchar(&vm->lexer) == '_')
+					advchar(&vm->lexer);
 
 				poly_TokenType type = POLY_TOKEN_IDENTIFIER;
 
 				// Check if the name is reserved word/keyword
 				for (int i = 0; keyword[i].word != NULL; i++)
-					if (memcmp(&vm->parser.lexer.tokenstart, keyword[i].word, keyword[i].len) == 0)
+					if (memcmp(&vm->lexer.tokenstart, keyword[i].word, keyword[i].len) == 0)
 					{
 						type = keyword[i].type;
 						break;
 					}
 
 				poly_Token *t = mktoken(vm, type);
+				poly_Value *val = (poly_Value*)vm->config->alloc(NULL, sizeof(poly_Value));
 
 				if (type == POLY_TOKEN_FALSE || type == POLY_TOKEN_TRUE)
 				{
-					t->val.type = POLY_VAL_BOOL;
-					t->val.bool = (type == POLY_TOKEN_FALSE ? 0 : 1);
+					val->type = POLY_VAL_BOOL;
+					val->bool = (type == POLY_TOKEN_FALSE ? 0 : 1);
 				}
 				else if (type == POLY_TOKEN_IDENTIFIER)
 				{
-					t->val.str = vm->config->alloc(NULL, CHAR_BIT * sizeof(t->len));
-					strncpy(t->val.str, t->start, t->len);
-					t->val.str[t->len] = '\0';
-					t->val.type = POLY_VAL_ID;
+					val->str = vm->config->alloc(NULL, CHAR_BIT * sizeof(t->len));
+					strncpy(val->str, t->start, t->len);
+					val->str[t->len] = '\0';
+					val->type = POLY_VAL_ID;
 				}
+
+				t->val = val;
 
 				break;
 			}
 			
-			throwerr(&vm->parser.lexer, "unknown symbol");
+			throwerr(&vm->lexer, "unknown symbol");
 		}
 
-		advchar(&vm->parser.lexer);
+		advchar(&vm->lexer);
 	}
 
 	mktoken(vm, POLY_TOKEN_EOF);
@@ -370,7 +375,7 @@ POLY_LOCAL void lex(poly_VM *vm)
 
 #ifdef POLY_DEBUG
 	POLY_IMM_LOG(LEX, "Allocated %zu bytes for %zu tokens\n",
-		vm->parser.tokenstream.allotedmem,
-		vm->parser.tokenstream.size)
+		vm->lexer.tokenstream.allotedmem,
+		vm->lexer.tokenstream.size)
 #endif
 }

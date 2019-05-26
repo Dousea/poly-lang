@@ -78,7 +78,7 @@ POLY_API poly_VM *polyNewVM(poly_Config *config)
 		memcpy(vm->config, config, sizeof(poly_Config));
 	}
 
-	poly_TokenStream *tokenstream = &vm->parser.tokenstream;
+	poly_TokenStream *tokenstream = &vm->lexer.tokenstream;
 	tokenstream->allotedmem = tokenstream->size = 0;
 	tokenstream->maxmem = POLY_INIT_MEM;
 	tokenstream->stream = vm->config->alloc(NULL, POLY_INIT_MEM);
@@ -99,7 +99,6 @@ POLY_API void polyFreeVM(poly_VM *vm)
 	POLY_IMM_LOG(API, "Freeing VM...\n")
 #endif
 
-	vm->config->alloc(vm->parser.tokenstream.stream, 0);
 	vm->config->alloc(vm->codestream.stream, 0);
 	// We use the default allocator because we need to deallocate the config
 	// and the VM
@@ -113,9 +112,14 @@ POLY_API void polyInterpret(poly_VM *vm, const char *src)
 	POLY_IMM_LOG(API, "Interpreting source...\n")
 #endif
 
-	vm->parser.lexer.src = vm->parser.lexer.curchar = src;
+	vm->lexer.src = vm->lexer.curchar = src;
 
 	lex(vm);
 	parse(vm);
+	
+	// We have done lexing and parsing so we don't need the tokens no more...
+	// so what about we delete the tokens so we got ourselves more memory?
+	vm->config->alloc(vm->lexer.tokenstream.stream, 0);
+
 	interpret(vm);
 }
