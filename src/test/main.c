@@ -4,12 +4,8 @@
 int main()
 {
 	PolyVM *vm = polyNewVM(NULL);
-
-	polyInterpret(vm,
-"# Let's do a simple arithmetic\n\
-one = 1\n\
-two = 2\n\
-three = one + two");
+ 
+	polyInterpret(vm, "n = 3 + 4 * 2 / ( 1 - 5 ) ^ 2 ^ 3");
 	polyFreeVM(vm);
 
 	return 0;
