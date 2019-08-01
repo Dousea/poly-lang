@@ -16,6 +16,7 @@ typedef struct poly_Operator
 	poly_TokenType type;
 	int prec;
 	poly_OperatorAssociativity assoc;
+	_Bool unary;
 } poly_Operator;
 
 typedef struct poly_Parser

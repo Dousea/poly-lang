@@ -29,7 +29,12 @@ static void pushvalue(poly_VM *vm, poly_Value *val)
 	POLY_LOG_START(VMA)
 
 	if (val->type == POLY_VAL_NUM)
-		POLY_LOG("%.02f", val->num)
+	{
+		if (ceilf(val->num) == val->num)
+			POLY_LOG("%.00f", val->num)
+		else
+			POLY_LOG("%f", val->num)
+	}
 	else if (val->type == POLY_VAL_BOOL)
 		POLY_LOG("%s", (val->bool ? "true" : "false"))
 	else
@@ -40,7 +45,12 @@ static void pushvalue(poly_VM *vm, poly_Value *val)
 	for (unsigned int i = 0; i < vm->stack.size; ++i)
 	{
 		if (vm->stack.val[i]->type == POLY_VAL_NUM)
-			POLY_LOG("%.02f ", vm->stack.val[i]->num)
+		{
+			if (ceilf(vm->stack.val[i]->num) == vm->stack.val[i]->num)
+				POLY_LOG("%.00f ", vm->stack.val[i]->num)
+			else
+				POLY_LOG("%f ", vm->stack.val[i]->num)
+		}
 		else if (vm->stack.val[i]->type == POLY_VAL_BOOL)
 			POLY_LOG("%s ", (vm->stack.val[i]->bool ? "true" : "false"))
 		else
@@ -63,7 +73,12 @@ static poly_Value *popvalue(poly_VM *vm)
 	POLY_LOG_START(VMA)
 
 	if (val->type == POLY_VAL_NUM)
-		POLY_LOG("%.02f", val->num)
+	{
+		if (ceilf(val->num) == val->num)
+			POLY_LOG("%.00f", val->num)
+		else
+			POLY_LOG("%f", val->num)
+	}
 	else if (val->type == POLY_VAL_BOOL)
 		POLY_LOG("%s", (val->bool ? "true" : "false"))
 	else
@@ -74,7 +89,12 @@ static poly_Value *popvalue(poly_VM *vm)
 	for (unsigned int i = 0; i < vm->stack.size; ++i)
 	{
 		if (vm->stack.val[i]->type == POLY_VAL_NUM)
-			POLY_LOG("%.02f ", vm->stack.val[i]->num)
+		{
+			if (ceilf(vm->stack.val[i]->num) == vm->stack.val[i]->num)
+				POLY_LOG("%.00f ", vm->stack.val[i]->num)
+			else
+				POLY_LOG("%f ", vm->stack.val[i]->num)
+		}
 		else if (vm->stack.val[i]->type == POLY_VAL_BOOL)
 			POLY_LOG("%s ", (vm->stack.val[i]->bool ? "true" : "false"))
 		else
@@ -180,12 +200,11 @@ POLY_LOCAL void interpret(poly_VM *vm)
 		case POLY_INST_BIN_MUL:
 		case POLY_INST_BIN_DIV:
 		case POLY_INST_BIN_MOD:
-		case POLY_INST_BIN_POW:
+		case POLY_INST_BIN_EXP:
 		{
 			poly_Value *rval = popvalue(vm);
 			poly_Value *lval = popvalue(vm);
 
-			// If the values are identifiers, get the respective values
 			if (rval->type == POLY_VAL_ID)
 				rval = getvalue(vm, rval->str);
 			if (lval->type == POLY_VAL_ID)
@@ -217,6 +236,28 @@ POLY_LOCAL void interpret(poly_VM *vm)
 			vm->config->alloc(lval, 0);
 			vm->config->alloc(rval, 0);
 			pushvalue(vm, val);
+
+			break;
+		}
+		case POLY_INST_UN_NEG:
+		{
+			poly_Value *val = popvalue(vm);
+
+			if (val->type == POLY_VAL_ID)
+				val = getvalue(vm, val->str);
+			
+			poly_Value *newval = vm->config->alloc(NULL, sizeof(poly_Value));
+
+			if (val->type == POLY_VAL_NUM)
+			{
+				newval->type = POLY_VAL_NUM;
+				newval->num = -val->num;
+			}
+			else
+				throwerr("the operand is illegal");
+			
+			vm->config->alloc(val, 0);
+			pushvalue(vm, newval);
 
 			break;
 		}

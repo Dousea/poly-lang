@@ -24,6 +24,11 @@ static const poly_Token *curtoken(poly_Lexer *lexer)
 	return lexer->tokenstream.cur;
 }
 
+static const poly_Token *prevtoken(poly_Lexer *lexer)
+{
+	return lexer->tokenstream.cur-1;
+}
+
 // Advances to the next token
 static void advtoken(poly_Lexer *lexer)
 {
@@ -36,8 +41,8 @@ static void advtoken(poly_Lexer *lexer)
 	lexer->tokenstream.cur++;
 }
 
-// If current token type is [t] advance to the token then return 1, otherwise
-// return 0
+// If current token type is [type] then advance to the token then return 1,
+// otherwise return 0
 static _Bool curtokenadv(poly_Lexer *lexer, poly_TokenType type)
 {
 	if (curtoken(lexer)->type == type)
@@ -101,20 +106,61 @@ static void mkcode(poly_VM *vm, poly_Instruction inst, poly_Value *val)
 	}
 }
 
-/////////////////////////////////
-/*** SHUNTING YARD ALGORITHM ***/
-/////////////////////////////////
+static _Bool islit(poly_TokenType type)
+{
+	return (type == POLY_TOKEN_FALSE ||
+		    type == POLY_TOKEN_TRUE || 
+		    type == POLY_TOKEN_NUMBER ||
+		    type == POLY_TOKEN_IDENTIFIER);
+}
 
-static poly_Operator operators[] = {
-	{ POLY_TOKEN_CARET,         9, POLY_OP_ASSOC_RIGHT },
-	{ POLY_TOKEN_ASTERISK,      8, POLY_OP_ASSOC_LEFT  },
-	{ POLY_TOKEN_SLASH,         8, POLY_OP_ASSOC_LEFT  },
-	{ POLY_TOKEN_PRCNTSGN,      8, POLY_OP_ASSOC_LEFT  },
-	{ POLY_TOKEN_PLUS,          5, POLY_OP_ASSOC_LEFT  },
-	{ POLY_TOKEN_MINUS,         5, POLY_OP_ASSOC_LEFT  },
-	{ POLY_TOKEN_OPENRNDBRCKT,  0, POLY_OP_ASSOC_NONE  },
-	{ POLY_TOKEN_CLOSERNDBRCKT, 0, POLY_OP_ASSOC_NONE  }
-};
+static _Bool ismulop(poly_TokenType type)
+{
+	return (type == POLY_TOKEN_ASTERISK ||
+	        type == POLY_TOKEN_SLASH ||
+			type == POLY_TOKEN_PRCNTSGN);
+}
+
+static _Bool isaddop(poly_TokenType type)
+{
+	return (type == POLY_TOKEN_PLUS ||
+			type == POLY_TOKEN_MINUS);
+}
+
+static _Bool isaritheq(poly_TokenType type)
+{
+	return (type == POLY_TOKEN_EQEQ ||
+			type == POLY_TOKEN_UNEQ ||
+			type == POLY_TOKEN_GTEQ ||
+			type == POLY_TOKEN_LTEQ);
+}
+
+static _Bool isarithunary(poly_TokenType type)
+{
+	return type == POLY_TOKEN_MINUS ||
+	       type == POLY_TOKEN_PLUS;
+}
+
+static _Bool islogiceq(poly_TokenType type)
+{
+	return (type == POLY_TOKEN_AND ||
+	        type == POLY_TOKEN_OR);
+}
+
+static _Bool islogicunary(poly_TokenType type)
+{
+	return type == POLY_TOKEN_NOT;
+}
+
+static _Bool isop(poly_TokenType type)
+{
+	return isaddop(type) ||
+		   ismulop(type) ||
+	       isaritheq(type) ||
+		   isarithunary(type) ||
+		   islogiceq(type) ||
+		   islogicunary(type);
+}
 
 static const poly_Operator *gettopopstack(poly_Parser *parser)
 {
@@ -127,7 +173,7 @@ static void pushopstack(poly_Parser *parser, const poly_Operator *op)
 		throwerr(parser, "operator stack overflow");
 	
 #ifdef POLY_DEBUG
-	POLY_IMM_LOG(PRS, "Pushing operator 0x%02X...\n", op->type)
+	POLY_IMM_LOG(PRS, "Pushing%s operator 0x%02X...\n", (op->unary ? " unary" : ""), op->type)
 #endif
 	
 	parser->opstack[parser->opstacksize++] = op;
@@ -139,45 +185,74 @@ static const poly_Operator *popopstack(poly_Parser *parser)
 		throwerr(parser, "operator stack empty");
 
 #ifdef POLY_DEBUG
-	POLY_IMM_LOG(PRS, "Popping operator 0x%02X...\n", parser->opstack[parser->opstacksize-1]->type)
+	POLY_IMM_LOG(PRS, "Popping%s operator 0x%02X...\n",
+		parser->opstack[parser->opstacksize-1]->unary ? " unary" : "",
+		parser->opstack[parser->opstacksize-1]->type)
 #endif
 
 	return parser->opstack[--parser->opstacksize];
 }
 
-static void pushopcode(poly_VM *vm, poly_TokenType type)
+static void pushopcode(poly_VM *vm, const poly_Operator *op)
 {
-	switch (type)
-	{
-	case POLY_TOKEN_PLUS:
-		mkcode(vm, POLY_INST_BIN_ADD, curtoken(&vm->lexer)->val); break;
-	case POLY_TOKEN_MINUS:
-		mkcode(vm, POLY_INST_BIN_SUB, curtoken(&vm->lexer)->val); break;
-	case POLY_TOKEN_ASTERISK:
-		mkcode(vm, POLY_INST_BIN_MUL, curtoken(&vm->lexer)->val); break;
-	case POLY_TOKEN_SLASH:
-		mkcode(vm, POLY_INST_BIN_DIV, curtoken(&vm->lexer)->val); break;
-	case POLY_TOKEN_PRCNTSGN:
-		mkcode(vm, POLY_INST_BIN_MOD, curtoken(&vm->lexer)->val); break;
-	case POLY_TOKEN_CARET:
-		mkcode(vm, POLY_INST_BIN_POW, curtoken(&vm->lexer)->val); break;
-	default:
-		break;
-	}
+	if (!op->unary)
+		switch (op->type)
+		{
+		case POLY_TOKEN_PLUS:
+			mkcode(vm, POLY_INST_BIN_ADD, NULL); break;
+		case POLY_TOKEN_MINUS:
+			mkcode(vm, POLY_INST_BIN_SUB, NULL); break;
+		case POLY_TOKEN_ASTERISK:
+			mkcode(vm, POLY_INST_BIN_MUL, NULL); break;
+		case POLY_TOKEN_SLASH:
+			mkcode(vm, POLY_INST_BIN_DIV, NULL); break;
+		case POLY_TOKEN_PRCNTSGN:
+			mkcode(vm, POLY_INST_BIN_MOD, NULL); break;
+		case POLY_TOKEN_CARET:
+			mkcode(vm, POLY_INST_BIN_EXP, NULL); break;
+		case POLY_TOKEN_EQEQ:
+			mkcode(vm, POLY_INST_BIN_EQEQ, NULL); break;
+		case POLY_TOKEN_UNEQ:
+			mkcode(vm, POLY_INST_BIN_UNEQ, NULL); break;
+		case POLY_TOKEN_LTEQ:
+			mkcode(vm, POLY_INST_BIN_LTEQ, NULL); break;
+		case POLY_TOKEN_GTEQ:
+			mkcode(vm, POLY_INST_BIN_GTEQ, NULL); break;
+		default:
+			break;
+		}
+	else
+		switch (op->type)
+		{
+		case POLY_TOKEN_MINUS:
+			mkcode(vm, POLY_INST_UN_NEG, NULL); break;
+		default:
+			break;
+		}
 }
 
-///////////////////////
-/*** GRAMMAR RULES ***/
-///////////////////////
+/*
+	value ::= BOOLEAN | NUMBER | IDENTIFIER | STRING
+
+	arith-exp ::= '(' arith-exp ')'                           |
+   				      arith-exp ( '^'           arith-exp ) * |
+				      arith-exp ( ( '*' | '/' ) arith-exp ) * |
+			          arith-exp ( ( '+' | '-' ) arith-exp ) * |
+				      value
+	
+    logic-exp ::= exp       ( ( '==' | '!=' | '>=' | '<=' ) exp       ) * |
+                  logic-exp ( ( 'and' | 'or' )              logic-exp ) * |
+
+	exp ::= '-' arith-exp |
+	            arith-exp |
+			  '(' logic-exp ')' |
+			'not' logic-exp     |
+			      logic-exp
+*/
 
 static _Bool value(poly_VM *vm)
 {
-	switch (curtoken(&vm->lexer)->type)
-	{
-	case POLY_TOKEN_FALSE:
-	case POLY_TOKEN_TRUE:
-	case POLY_TOKEN_NUMBER:
-	case POLY_TOKEN_IDENTIFIER:
+	if (islit(curtoken(&vm->lexer)->type))
 	{
 #ifdef POLY_DEBUG
 		POLY_LOG_START(PRS)
@@ -198,12 +273,26 @@ static _Bool value(poly_VM *vm)
 		advtoken(&vm->lexer);
 		return 1;
 	}
-	default:
-		break;
-	}
 
 	return 0;
 }
+
+static poly_Operator operators[] = {
+	{ POLY_TOKEN_OPENRNDBRCKT,  0, POLY_OP_ASSOC_NONE,  0},
+	{ POLY_TOKEN_CLOSERNDBRCKT, 0, POLY_OP_ASSOC_NONE,  0},
+	{ POLY_TOKEN_CARET,         7, POLY_OP_ASSOC_RIGHT, 0},
+	{ POLY_TOKEN_ASTERISK,      6, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_SLASH,         6, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_PRCNTSGN,      6, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_PLUS,          5, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_MINUS,         5, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_EQEQ, 			4, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_UNEQ,			4, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_LTEQ,			4, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_GTEQ,			4, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_MINUS,         8, POLY_OP_ASSOC_NONE,  1},
+	{ POLY_TOKEN_PLUS,          8, POLY_OP_ASSOC_NONE,  1}
+};
 
 static const poly_Operator *operator(poly_VM *vm)
 {
@@ -230,48 +319,90 @@ static _Bool expression(poly_VM *vm)
 	POLY_IMM_LOG(PRS, "Reading expression...\n")
 #endif
 
+	poly_TokenType prevop = POLY_TOKEN_NONE;
 	const poly_Operator *op = NULL;
 	const poly_Operator *pop;
 
 	while (1)
 	{
 		if (value(vm))
+		{
+			prevop = prevtoken(&vm->lexer)->type;
 			// ... so we got a value; continue.
 			continue;
+		}
 		else if ((op = operator(vm)) == NULL)
-			// ... but we didn't get anything; break.
+			// ... but we didn't get any operator; break.
 			break;
 		
-		if (op->type == POLY_TOKEN_OPENRNDBRCKT)
+		switch (op->type)
 		{
-			pushopstack(&vm->parser, op);
-			continue;
-		}
-		else if (op->type == POLY_TOKEN_CLOSERNDBRCKT)
+		case POLY_TOKEN_OPENRNDBRCKT:
+		case POLY_TOKEN_CLOSERNDBRCKT:
 		{
-			
-			while (gettopopstack(&vm->parser)->type != POLY_TOKEN_OPENRNDBRCKT)
+			if (op->type == POLY_TOKEN_OPENRNDBRCKT)
 			{
-				pop = popopstack(&vm->parser);
-				pushopcode(vm, pop->type);
+				pushopstack(&vm->parser, op);
+			}
+			else if (op->type == POLY_TOKEN_CLOSERNDBRCKT)
+			{
+				while (gettopopstack(&vm->parser)->type != POLY_TOKEN_OPENRNDBRCKT)
+				{
+					pop = popopstack(&vm->parser);
+					pushopcode(vm, pop);
+				}
+
+				if ((pop = popopstack(&vm->parser)) == NULL ||
+					pop->type != POLY_TOKEN_OPENRNDBRCKT)
+					throwerr(&vm->parser, "no matching \'(\'");
 			}
 
-			if ((pop = popopstack(&vm->parser)) == NULL ||
-			    pop->type != POLY_TOKEN_OPENRNDBRCKT)
-				throwerr(&vm->parser, "no matching \'(\'");
-
-			continue;
+			break;
 		}
-		
-		while (vm->parser.opstacksize > 0 &&
-		       ((op->assoc == POLY_OP_ASSOC_RIGHT && gettopopstack(&vm->parser)->prec > op->prec) ||
-			    (op->assoc == POLY_OP_ASSOC_LEFT && gettopopstack(&vm->parser)->prec >= op->prec)))
+		default:
 		{
-			pop = popopstack(&vm->parser);
-			pushopcode(vm, pop->type);
+			if (isarithunary(op->type))
+				// Is unary if there is no previous token or
+				//             previous token is any operator other than closing bracket.
+				// Is binary otherwise.
+				if (prevop == POLY_TOKEN_NONE ||
+				    (isop(prevop) &&
+					 prevop != POLY_TOKEN_CLOSERNDBRCKT))
+				{
+#ifdef POLY_DEBUG
+					POLY_IMM_LOG(PRS, "... that is an unary operator (0x%02X)\n", prevop)
+#endif
+
+					if (op->type == POLY_TOKEN_PLUS)
+						// Unary plus is useless; continue...
+						continue; // while
+					else
+					{
+						// Let's switch this `op` to the negation operator
+						for (unsigned int i = 0; i < sizeof operators / sizeof operators[0]; i++)
+						{
+							if (operators[i].type == op->type && operators[i].unary)
+							{
+								op = &operators[i];
+								break; // for
+							}
+						}
+					}
+				}
+
+			while (vm->parser.opstacksize > 0 &&
+				   ((op->assoc == POLY_OP_ASSOC_RIGHT && gettopopstack(&vm->parser)->prec > op->prec) ||
+				    (op->assoc == POLY_OP_ASSOC_LEFT && gettopopstack(&vm->parser)->prec >= op->prec)))
+			{
+				pop = popopstack(&vm->parser);
+				pushopcode(vm, pop);
+			}
+
+			pushopstack(&vm->parser, op);
+		}
 		}
 		
-		pushopstack(&vm->parser, op);
+		prevop = op->type;
 	}
 
 	while (vm->parser.opstacksize > 0 && (op = popopstack(&vm->parser)) != NULL)
@@ -279,7 +410,7 @@ static _Bool expression(poly_VM *vm)
 		if (op->type == POLY_TOKEN_OPENRNDBRCKT)
 			throwerr(&vm->parser, "no matching \')\'");
 		
-		pushopcode(vm, op->type);
+		pushopcode(vm, op);
 	}
 	
 	return 1;
@@ -385,7 +516,9 @@ POLY_LOCAL void parse(poly_VM *vm)
 			advtoken(&vm->lexer);
 			break;
 		default:
-			statement(vm);
+			if (!statement(vm))
+				throwerr(&vm->parser, "incorrect syntax");
+
 			break;
 		}
 	}
