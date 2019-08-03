@@ -8,14 +8,18 @@ typedef enum poly_ValueType
 	POLY_VAL_ID
 } poly_ValueType;
 
+typedef char* poly_String;
+typedef double poly_Number;
+typedef _Bool poly_Boolean;
+
 typedef struct poly_Value
 {
 	poly_ValueType type;
 	union
 	{
-		char *str;
-		double num;
-		_Bool bool;
+		poly_String str;
+		poly_Number num;
+		poly_Boolean bool;
 	};
 } poly_Value;
 
