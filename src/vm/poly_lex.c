@@ -337,7 +337,7 @@ POLY_LOCAL void lex(poly_VM *vm)
 
 				// Check if the name is reserved word/keyword
 				for (int i = 0; keyword[i].word != NULL; i++)
-					if (memcmp(&vm->lexer.tokenstart, keyword[i].word, keyword[i].len) == 0)
+					if (memcmp(vm->lexer.tokenstart, keyword[i].word, keyword[i].len) == 0)
 					{
 						type = keyword[i].type;
 						break;
