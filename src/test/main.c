@@ -5,7 +5,7 @@ int main()
 {
 	PolyVM *vm = polyNewVM(NULL);
  
-	polyInterpret(vm, "n = -3 + 4 * 2 / -( 1 - 5 ) ^ 2 ^ 3");
+	polyInterpret(vm, "n = not true or not false == true");
 	polyFreeVM(vm);
 
 	return 0;
