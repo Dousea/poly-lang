@@ -24,6 +24,7 @@ static const poly_Token *curtoken(poly_Lexer *lexer)
 	return lexer->tokenstream.cur;
 }
 
+// Gets previous parsed token
 static const poly_Token *prevtoken(poly_Lexer *lexer)
 {
 	return lexer->tokenstream.cur-1;
@@ -218,6 +219,10 @@ static void pushopcode(poly_VM *vm, const poly_Operator *op)
 			mkcode(vm, POLY_INST_BIN_LTEQ, NULL); break;
 		case POLY_TOKEN_GTEQ:
 			mkcode(vm, POLY_INST_BIN_GTEQ, NULL); break;
+		case POLY_TOKEN_AND:
+			mkcode(vm, POLY_INST_BIN_AND, NULL); break;
+		case POLY_TOKEN_OR:
+			mkcode(vm, POLY_INST_BIN_OR, NULL); break;
 		default:
 			break;
 		}
@@ -226,6 +231,8 @@ static void pushopcode(poly_VM *vm, const poly_Operator *op)
 		{
 		case POLY_TOKEN_MINUS:
 			mkcode(vm, POLY_INST_UN_NEG, NULL); break;
+		case POLY_TOKEN_NOT:
+			mkcode(vm, POLY_INST_UN_NOT, NULL); break;
 		default:
 			break;
 		}
@@ -290,6 +297,11 @@ static poly_Operator operators[] = {
 	{ POLY_TOKEN_UNEQ,			4, POLY_OP_ASSOC_LEFT,  0},
 	{ POLY_TOKEN_LTEQ,			4, POLY_OP_ASSOC_LEFT,  0},
 	{ POLY_TOKEN_GTEQ,			4, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_NOT,           3, POLY_OP_ASSOC_NONE,  1},
+	{ POLY_TOKEN_AND,           2, POLY_OP_ASSOC_LEFT,  0},
+	{ POLY_TOKEN_OR,            1, POLY_OP_ASSOC_LEFT,  0},
+	// Unary minus/plus must be at the bottom so it can be checked whether
+	// the minus/plus is binary or unary at parsing phase
 	{ POLY_TOKEN_MINUS,         8, POLY_OP_ASSOC_NONE,  1},
 	{ POLY_TOKEN_PLUS,          8, POLY_OP_ASSOC_NONE,  1}
 };
@@ -361,6 +373,9 @@ static _Bool expression(poly_VM *vm)
 		}
 		default:
 		{
+			// Logic unary isn't here because it doesn't use the same token as
+			// its respective binary operator.
+			// Minus (-) and plus (+) have their binary and unary components.
 			if (isarithunary(op->type))
 				// Is unary if there is no previous token or
 				//             previous token is any operator other than closing bracket.
