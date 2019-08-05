@@ -336,30 +336,39 @@ POLY_LOCAL void lex(poly_VM *vm)
 				poly_TokenType type = POLY_TOKEN_IDENTIFIER;
 
 				// Check if the name is reserved word/keyword
+				_Bool isreserved = 0;
+
 				for (int i = 0; keyword[i].word != NULL; i++)
 					if (memcmp(vm->lexer.tokenstart, keyword[i].word, keyword[i].len) == 0)
 					{
+						isreserved = 1;
 						type = keyword[i].type;
 						break;
 					}
 
 				poly_Token *t = mktoken(vm, type);
-				poly_Value *val = (poly_Value*)vm->config->alloc(NULL, sizeof(poly_Value));
 
-				if (type == POLY_TOKEN_FALSE || type == POLY_TOKEN_TRUE)
+				if (!isreserved)
 				{
-					val->type = POLY_VAL_BOOL;
-					val->bool = (type == POLY_TOKEN_FALSE ? 0 : 1);
-				}
-				else if (type == POLY_TOKEN_IDENTIFIER)
-				{
-					val->str = vm->config->alloc(NULL, CHAR_BIT * sizeof(t->len));
-					strncpy(val->str, t->start, t->len);
-					val->str[t->len] = '\0';
-					val->type = POLY_VAL_ID;
-				}
+					poly_Value *val = (poly_Value*)vm->config->alloc(NULL, sizeof(poly_Value));
 
-				t->val = val;
+					if (type == POLY_TOKEN_NULL)
+						val->type = POLY_VAL_NULL;
+					if (type == POLY_TOKEN_FALSE || type == POLY_TOKEN_TRUE)
+					{
+						val->type = POLY_VAL_BOOL;
+						val->bool = (type == POLY_TOKEN_FALSE ? 0 : 1);
+					}
+					else if (type == POLY_TOKEN_IDENTIFIER)
+					{
+						val->str = vm->config->alloc(NULL, CHAR_BIT * sizeof(t->len));
+						strncpy(val->str, t->start, t->len);
+						val->str[t->len] = '\0';
+						val->type = POLY_VAL_ID;
+					}
+
+					t->val = val;
+				}
 
 				break;
 			}

@@ -3,6 +3,7 @@
 
 typedef enum poly_ValueType
 {
+	POLY_VAL_NULL,
 	POLY_VAL_NUM,
 	POLY_VAL_BOOL,
 	POLY_VAL_ID
