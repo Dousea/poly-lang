@@ -13,6 +13,9 @@ typedef char* poly_String;
 typedef double poly_Number;
 typedef _Bool poly_Boolean;
 
+#define POLY_FALSE 0
+#define POLY_TRUE  1
+
 typedef struct poly_Value
 {
 	poly_ValueType type;

@@ -278,33 +278,38 @@ POLY_LOCAL void interpret(poly_VM *vm)
 
 			poly_Value *val = vm->config->alloc(NULL, sizeof(poly_Value));
 			val->type = POLY_VAL_BOOL;
-			
-			if (lval->type == POLY_VAL_NUM &&
-			    rval->type == POLY_VAL_NUM)
-			{
-				if (curcode(vm)->inst == POLY_INST_BIN_EQEQ)
-					val->bool = lval->num == rval->num;
-				else if (curcode(vm)->inst == POLY_INST_BIN_UNEQ)
-					val->bool = lval->num != rval->num;
-				else if (curcode(vm)->inst == POLY_INST_BIN_LTEQ)
-					val->bool = lval->num <= rval->num;
-				else if (curcode(vm)->inst == POLY_INST_BIN_GTEQ)
-					val->bool = lval->num >= rval->num;
-				else
-					throwerr("invalid binary operator");
-			}
-			else if (lval->type == POLY_VAL_BOOL &&
-			         rval->type == POLY_VAL_BOOL)
-			{
-				if (curcode(vm)->inst == POLY_INST_BIN_EQEQ)
-					val->bool = lval->bool == rval->bool;
-				else if (curcode(vm)->inst == POLY_INST_BIN_UNEQ)
-					val->bool = lval->bool != rval->bool;
-				else
-					throwerr("invalid binary operator");
-			}
+
+			if (lval->type != rval->type)
+				val->bool = POLY_FALSE;
 			else
-				throwerr("the operands are illegal");
+			{
+				if (lval->type == POLY_VAL_NUM &&
+					rval->type == POLY_VAL_NUM)
+				{
+					if (curcode(vm)->inst == POLY_INST_BIN_EQEQ)
+						val->bool = lval->num == rval->num;
+					else if (curcode(vm)->inst == POLY_INST_BIN_UNEQ)
+						val->bool = lval->num != rval->num;
+					else if (curcode(vm)->inst == POLY_INST_BIN_LTEQ)
+						val->bool = lval->num <= rval->num;
+					else if (curcode(vm)->inst == POLY_INST_BIN_GTEQ)
+						val->bool = lval->num >= rval->num;
+					else
+						throwerr("invalid binary operator");
+				}
+				else if (lval->type == POLY_VAL_BOOL &&
+						rval->type == POLY_VAL_BOOL)
+				{
+					if (curcode(vm)->inst == POLY_INST_BIN_EQEQ)
+						val->bool = lval->bool == rval->bool;
+					else if (curcode(vm)->inst == POLY_INST_BIN_UNEQ)
+						val->bool = lval->bool != rval->bool;
+					else
+						throwerr("invalid binary operator");
+				}
+				else
+					throwerr("the operands are illegal");
+			}
 			
 			vm->config->alloc(lval, 0);
 			vm->config->alloc(rval, 0);
@@ -326,18 +331,38 @@ POLY_LOCAL void interpret(poly_VM *vm)
 			poly_Value *val = vm->config->alloc(NULL, sizeof(poly_Value));
 			val->type = POLY_VAL_BOOL;
 
-			if (lval->type == POLY_VAL_BOOL &&
-			    rval->type == POLY_VAL_BOOL)
+			poly_Boolean lbool, rbool;
+
+			switch (lval->type)
 			{
-				if (curcode(vm)->inst == POLY_INST_BIN_AND)
-					val->bool = lval->bool && rval->bool;
-				else if (curcode(vm)->inst == POLY_INST_BIN_OR)
-					val->bool = lval->bool || rval->bool;
-				else
-					throwerr("invalid binary operator");
+			case POLY_VAL_NULL:
+				lbool = POLY_FALSE; break;
+			case POLY_VAL_NUM:
+				lbool = POLY_TRUE; break;
+			case POLY_VAL_BOOL:
+				lbool = lval->bool; break;
+			default:
+				lbool = POLY_TRUE;
 			}
+
+			switch (rval->type)
+			{
+			case POLY_VAL_NULL:
+				rbool = POLY_FALSE; break;
+			case POLY_VAL_NUM:
+				rbool = POLY_TRUE; break;
+			case POLY_VAL_BOOL:
+				rbool = rval->bool; break;
+			default:
+				rbool = POLY_TRUE;
+			}
+
+			if (curcode(vm)->inst == POLY_INST_BIN_AND)
+				val->bool = lbool && rbool;
+			else if (curcode(vm)->inst == POLY_INST_BIN_OR)
+				val->bool = lbool || rbool;
 			else
-				throwerr("the operands are illegal");
+				throwerr("invalid binary operator");
 			
 			vm->config->alloc(lval, 0);
 			vm->config->alloc(rval, 0);

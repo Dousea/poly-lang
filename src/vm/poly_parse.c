@@ -107,7 +107,7 @@ static void mkcode(poly_VM *vm, poly_Instruction inst, poly_Value *val)
 	}
 }
 
-static _Bool islit(poly_TokenType type)
+inline static _Bool islit(poly_TokenType type)
 {
 	return (type == POLY_TOKEN_FALSE ||
 		    type == POLY_TOKEN_TRUE || 
@@ -115,52 +115,37 @@ static _Bool islit(poly_TokenType type)
 		    type == POLY_TOKEN_IDENTIFIER);
 }
 
-static _Bool ismulop(poly_TokenType type)
+inline static _Bool isarithop(poly_TokenType type)
 {
 	return (type == POLY_TOKEN_ASTERISK ||
 	        type == POLY_TOKEN_SLASH ||
-			type == POLY_TOKEN_PRCNTSGN);
-}
-
-static _Bool isaddop(poly_TokenType type)
-{
-	return (type == POLY_TOKEN_PLUS ||
+			type == POLY_TOKEN_PRCNTSGN ||
+			type == POLY_TOKEN_PLUS ||
 			type == POLY_TOKEN_MINUS);
 }
 
-static _Bool isaritheq(poly_TokenType type)
+inline static _Bool isrelationop(poly_TokenType type)
 {
 	return (type == POLY_TOKEN_EQEQ ||
 			type == POLY_TOKEN_UNEQ ||
 			type == POLY_TOKEN_GTEQ ||
-			type == POLY_TOKEN_LTEQ);
+			type == POLY_TOKEN_LTEQ ||
+			type == POLY_TOKEN_GT ||
+			type == POLY_TOKEN_LT);
 }
 
-static _Bool isarithunary(poly_TokenType type)
-{
-	return type == POLY_TOKEN_MINUS ||
-	       type == POLY_TOKEN_PLUS;
-}
-
-static _Bool islogiceq(poly_TokenType type)
+inline static _Bool islogicop(poly_TokenType type)
 {
 	return (type == POLY_TOKEN_AND ||
-	        type == POLY_TOKEN_OR);
+	        type == POLY_TOKEN_OR ||
+			type == POLY_TOKEN_NOT);
 }
 
-static _Bool islogicunary(poly_TokenType type)
+inline static _Bool isop(poly_TokenType type)
 {
-	return type == POLY_TOKEN_NOT;
-}
-
-static _Bool isop(poly_TokenType type)
-{
-	return isaddop(type) ||
-		   ismulop(type) ||
-	       isaritheq(type) ||
-		   isarithunary(type) ||
-		   islogiceq(type) ||
-		   islogicunary(type);
+	return (isarithop(type) ||
+	        isrelationop(type) ||
+			islogicop(type));
 }
 
 static const poly_Operator *gettopopstack(poly_Parser *parser)
@@ -331,6 +316,9 @@ static _Bool expression(poly_VM *vm)
 	POLY_IMM_LOG(PRS, "Reading expression...\n")
 #endif
 
+	const poly_Value *prevval = NULL;
+	const poly_Value *val = NULL;
+
 	poly_TokenType prevop = POLY_TOKEN_NONE;
 	const poly_Operator *op = NULL;
 	const poly_Operator *pop;
@@ -339,7 +327,25 @@ static _Bool expression(poly_VM *vm)
 	{
 		if (value(vm))
 		{
-			prevop = prevtoken(&vm->lexer)->type;
+			if (prevval != NULL && prevop != POLY_TOKEN_NONE)
+			{
+				val = prevtoken(&vm->lexer)->val; // ...is the parsed value
+
+				if (isarithop(prevop))
+					if (prevval->type != POLY_VAL_NUM || val->type != POLY_VAL_NUM)
+						throwerr(&vm->parser, "the operands are illegal");
+				
+				if (isrelationop(prevop))
+					if (prevop == POLY_TOKEN_GTEQ ||
+					    prevop == POLY_TOKEN_LTEQ ||
+						prevop == POLY_TOKEN_GT ||
+						prevop == POLY_TOKEN_LT)
+						if (prevval->type != POLY_VAL_NUM || val->type != POLY_VAL_NUM)
+							throwerr(&vm->parser, "the operands are illegal");
+			}
+			
+			prevval = prevtoken(&vm->lexer)->val; // ...is the data
+			prevop = prevtoken(&vm->lexer)->type; // ...is literal type
 			// ... so we got a value; continue.
 			continue;
 		}
@@ -376,7 +382,8 @@ static _Bool expression(poly_VM *vm)
 			// Logic unary isn't here because it doesn't use the same token as
 			// its respective binary operator.
 			// Minus (-) and plus (+) have their binary and unary components.
-			if (isarithunary(op->type))
+			if (op->type == POLY_TOKEN_MINUS ||
+			    op->type == POLY_TOKEN_PLUS)
 				// Is unary if there is no previous token or
 				//             previous token is any operator other than closing bracket.
 				// Is binary otherwise.
