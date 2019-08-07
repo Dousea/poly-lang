@@ -336,19 +336,19 @@ POLY_LOCAL void lex(poly_VM *vm)
 				poly_TokenType type = POLY_TOKEN_IDENTIFIER;
 
 				// Check if the name is reserved word/keyword
-				_Bool isreserved = 0;
-
 				for (int i = 0; keyword[i].word != NULL; i++)
 					if (memcmp(vm->lexer.tokenstart, keyword[i].word, keyword[i].len) == 0)
 					{
-						isreserved = 1;
 						type = keyword[i].type;
 						break;
 					}
 
 				poly_Token *t = mktoken(vm, type);
 
-				if (!isreserved)
+				if (type == POLY_TOKEN_NULL ||
+				    type == POLY_TOKEN_FALSE ||
+					type == POLY_TOKEN_TRUE ||
+					type == POLY_TOKEN_IDENTIFIER)
 				{
 					poly_Value *val = (poly_Value*)vm->config->alloc(NULL, sizeof(poly_Value));
 
